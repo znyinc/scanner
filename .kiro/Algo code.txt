@@ -1,0 +1,63 @@
+Algo
+
+
+ema5  = ta.ema(close, 5)
+ema8  = ta.ema(close, 8)
+ema13 = ta.ema(close, 13)
+ema21 = ta.ema(close, 21)
+ema50 = ta.ema(close, 50)
+
+// ATR Calculation
+atrValue = ta.atr(14)
+atrMultiplier = 2
+
+// Calculate the line 2 ATR below EMA 50
+atrLongLine = ema21 + (atrMultiplier * atrValue)
+atrShortLine = ema21 - (atrMultiplier * atrValue)
+
+
+//higher time frame analysis // Get 15-minute candle data
+
+higherTimeframe = input.timeframe("15", title = "Higher timeframe")
+
+
+indexHighTF = barstate.isrealtime ? 1 : 0
+indexCurrTF = barstate.isrealtime ? 0 : 1
+
+highTime_Close = request.security(syminfo.tickerid, higherTimeframe, close[indexHighTF])[indexCurrTF] 
+highTime_Open = request.security(syminfo.tickerid, higherTimeframe, open[indexHighTF])[indexCurrTF] 
+
+highTime_ema5 = request.security(syminfo.tickerid, higherTimeframe, ema5[indexHighTF])[indexCurrTF] 
+highTime_ema8 = request.security(syminfo.tickerid, higherTimeframe, ema8[indexHighTF])[indexCurrTF] 
+
+
+// === Long Entry Conditions ===
+
+longPolrFormed = close > open and close > ema8 and close > ema21 
+emaConditionLong = ema5 < atrLongLine and (close-low) <= 1.5 * atrValue 
+emaRising = ema5 >= ema5[1] + 0.02 and ema8 >= ema8[1] + 0.01 and ema21>= ema21[1] + 0.005 
+noLongFomoFlag =  close < ema21 + 1.0 * atrValue
+lowBelowEma5 = true // low < ema8 
+
+rawLongCondition = barstate.isconfirmed and longPolrFormed and emaConditionLong and emaRising and noLongFomoFlag and lowBelowEma5
+
+
+// === HigherTimeframe Long Entry Conditions ===
+
+Long_Condition = rawLongCondition and highTime_ema5 > highTime_ema8 and close > highTime_Close and close > highTime_Open
+
+
+// === Short Entry Conditions === 
+
+shortPolrFormed = close < open and close < ema8 and close < ema21
+emaConditionShort = ema5 > atrShortLine and (high-close) <= 1.5 * atrValue
+ema5Falling = ema5 <= ema5[1] - 0.02 and ema8 <= ema8[1] - 0.01 and ema21<= ema21[1] - 0.005 
+noShortFomoFlag =  close > ema21 - 1.0 * atrValue
+highAboveEma5 = true // high > ema8
+
+rawShortCondition = barstate.isconfirmed and shortPolrFormed and emaConditionShort and ema5Falling and noShortFomoFlag and highAboveEma5
+
+
+// === HigherTimeframe Short Entry Conditions === 
+
+Short_Condition = rawShortCondition and highTime_ema5 < highTime_ema8 and close < highTime_Close and close < highTime_Open
