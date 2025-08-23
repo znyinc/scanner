@@ -66,6 +66,7 @@ def _save_settings(settings: AlgorithmSettings) -> None:
 
 
 @router.get("/", response_model=SettingsResponse)
+@router.get("", response_model=SettingsResponse)  # Handle both with and without trailing slash
 async def get_settings():
     """
     Get current algorithm settings.
@@ -108,6 +109,7 @@ async def get_settings():
 
 
 @router.put("/", response_model=SettingsResponse)
+@router.put("", response_model=SettingsResponse)  # Handle both with and without trailing slash
 async def update_settings(request: SettingsRequest, http_request: Request):
     """
     Update algorithm settings.

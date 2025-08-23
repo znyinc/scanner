@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime
 
 from .api import scan, backtest, settings
 
@@ -26,3 +27,8 @@ app.include_router(settings.router)
 @app.get("/")
 async def root():
     return {"message": "Stock Scanner API", "version": "1.0.0"}
+
+@app.get("/health")
+async def health():
+    """Health check endpoint."""
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}

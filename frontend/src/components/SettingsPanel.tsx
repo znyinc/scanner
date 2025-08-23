@@ -59,7 +59,7 @@ const SettingsPanel: React.FC = () => {
       setSettings(currentSettings);
       setOriginalSettings(currentSettings);
     } catch (err) {
-      setError(handleApiError(err));
+      setError(handleApiError(err).message);
       // Use default settings if loading fails
       setSettings(defaultSettings);
       setOriginalSettings(defaultSettings);
@@ -89,7 +89,7 @@ const SettingsPanel: React.FC = () => {
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(handleApiError(err));
+      setError(handleApiError(err).message);
     } finally {
       setIsSaving(false);
     }

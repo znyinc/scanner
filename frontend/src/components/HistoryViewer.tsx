@@ -87,7 +87,7 @@ const HistoryViewer: React.FC = () => {
       setScanHistory(scans);
       setBacktestHistory(backtests);
     } catch (err) {
-      setError(handleApiError(err));
+      setError(handleApiError(err).message);
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +131,7 @@ const HistoryViewer: React.FC = () => {
       setScanHistory(scans);
       setBacktestHistory(backtests);
     } catch (err) {
-      setError(handleApiError(err));
+      setError(handleApiError(err).message);
     } finally {
       setIsLoading(false);
     }

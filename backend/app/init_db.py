@@ -2,9 +2,13 @@
 Database initialization script using SQLAlchemy.
 This script creates all tables and indexes programmatically.
 """
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from sqlalchemy import text
-from .database import engine, create_tables
-from .models.database_models import Base
+from app.database import engine, create_tables
+from app.models.database_models import Base
 
 
 def init_database():

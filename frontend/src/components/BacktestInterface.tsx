@@ -88,7 +88,7 @@ const BacktestInterface: React.FC = () => {
       );
       setResult(backtestResult);
     } catch (err) {
-      setError(handleApiError(err));
+      setError(handleApiError(err).message);
     } finally {
       setIsRunning(false);
     }
