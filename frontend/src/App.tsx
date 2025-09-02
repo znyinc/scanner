@@ -10,6 +10,7 @@ import {
   Tabs,
   Tab,
   Box,
+  useMediaQuery,
 } from '@mui/material';
 import { TrendingUp } from '@mui/icons-material';
 import { AppProvider, useAppContext, useAppActions } from './contexts/AppContext';
@@ -30,6 +31,30 @@ const theme = createTheme({
       main: '#dc004e',
     },
   },
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 900,
+      lg: 1200,
+      xl: 1536,
+    },
+  },
+  typography: {
+    // Responsive typography
+    h4: {
+      fontSize: '1.75rem',
+      '@media (max-width:600px)': {
+        fontSize: '1.5rem',
+      },
+    },
+    h6: {
+      fontSize: '1.25rem',
+      '@media (max-width:600px)': {
+        fontSize: '1.1rem',
+      },
+    },
+  },
   components: {
     // Add rotating animation for sync icon
     MuiSvgIcon: {
@@ -37,6 +62,63 @@ const theme = createTheme({
         root: {
           '&.rotating': {
             animation: 'spin 2s linear infinite',
+          },
+        },
+      },
+    },
+    // Enhanced button accessibility and touch targets
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          minHeight: 44, // Minimum touch target size
+          '@media (max-width:600px)': {
+            minHeight: 48, // Larger touch targets on mobile
+            fontSize: '0.875rem',
+          },
+        },
+      },
+    },
+    // Enhanced table responsiveness
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          '@media (max-width:600px)': {
+            fontSize: '0.75rem',
+          },
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          '@media (max-width:600px)': {
+            padding: '8px 4px',
+            fontSize: '0.75rem',
+          },
+        },
+      },
+    },
+    // Enhanced tab accessibility
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          minHeight: 48,
+          '@media (max-width:600px)': {
+            minWidth: 'auto',
+            fontSize: '0.75rem',
+            padding: '6px 8px',
+          },
+        },
+      },
+    },
+    // Enhanced form controls
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiInputBase-root': {
+            '@media (max-width:600px)': {
+              fontSize: '16px', // Prevents zoom on iOS
+            },
           },
         },
       },
@@ -60,7 +142,12 @@ interface TabPanelProps {
 
 const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
   return (
-    <div hidden={value !== index}>
+    <div 
+      role="tabpanel"
+      hidden={value !== index}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`tab-${index}`}
+    >
       {value === index && <Box>{children}</Box>}
     </div>
   );
@@ -69,6 +156,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 const AppContent: React.FC = () => {
   const { state } = useAppContext();
   const { setActiveTab } = useAppActions();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -82,31 +170,120 @@ const AppContent: React.FC = () => {
     setActiveTab(3);
   };
 
+  // Skip link for keyboard navigation
+  const handleSkipToMain = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const mainContent = document.getElementById('main-content');
+      if (mainContent) {
+        mainContent.focus();
+        mainContent.scrollIntoView();
+      }
+    }
+  };
+
   return (
     <>
       <style>{globalStyles}</style>
       <CssBaseline />
-      <AppBar position="static">
-        <Toolbar>
-          <TrendingUp sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Stock Scanner - EMA-ATR Algorithm
+      
+      {/* Skip to main content link for keyboard users */}
+      <a 
+        href="#main-content" 
+        className="skip-link"
+        onKeyDown={handleSkipToMain}
+        aria-label="Skip to main content"
+      >
+        Skip to main content
+      </a>
+      
+      <AppBar position="static" role="banner">
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
+          <TrendingUp sx={{ mr: { xs: 1, sm: 2 } }} aria-hidden="true" />
+          <Typography 
+            variant="h6" 
+            component="h1" 
+            sx={{ 
+              flexGrow: 1,
+              fontSize: { xs: '1rem', sm: '1.25rem' },
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {isMobile ? 'Stock Scanner' : 'Stock Scanner - EMA-ATR Algorithm'}
           </Typography>
           <StatusIndicator />
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
-        <Tabs 
-          value={state.activeTab} 
-          onChange={handleTabChange}
-          sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
-        >
-          <Tab label="Scanner" />
-          <Tab label="Backtest" />
-          <Tab label="History" />
-          <Tab label="Settings" />
-        </Tabs>
+      <Container 
+        maxWidth="xl" 
+        component="main"
+        id="main-content"
+        tabIndex={-1}
+        sx={{ 
+          mt: { xs: 1, sm: 2 },
+          px: { xs: 1, sm: 2 },
+          pb: { xs: 2, sm: 3 },
+          outline: 'none'
+        }}
+        role="main"
+        aria-label="Main application content"
+      >
+        <nav role="navigation" aria-label="Main navigation">
+          <Tabs 
+            value={state.activeTab} 
+            onChange={handleTabChange}
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons={isMobile ? "auto" : false}
+            allowScrollButtonsMobile
+            sx={{ 
+              borderBottom: 1, 
+              borderColor: 'divider', 
+              mb: { xs: 1, sm: 2 },
+              '& .MuiTabs-flexContainer': {
+                gap: { xs: 0, sm: 1 }
+              },
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 500,
+                '&:hover': {
+                  backgroundColor: 'action.hover',
+                },
+                '&.Mui-selected': {
+                  fontWeight: 600,
+                }
+              }
+            }}
+            aria-label="Main navigation tabs"
+          >
+            <Tab 
+              label="Scanner" 
+              id="tab-0"
+              aria-controls="tabpanel-0"
+              sx={{ minWidth: { xs: 'auto', sm: 90 } }}
+            />
+            <Tab 
+              label="Backtest" 
+              id="tab-1"
+              aria-controls="tabpanel-1"
+              sx={{ minWidth: { xs: 'auto', sm: 90 } }}
+            />
+            <Tab 
+              label="History" 
+              id="tab-2"
+              aria-controls="tabpanel-2"
+              sx={{ minWidth: { xs: 'auto', sm: 90 } }}
+            />
+            <Tab 
+              label="Settings" 
+              id="tab-3"
+              aria-controls="tabpanel-3"
+              sx={{ minWidth: { xs: 'auto', sm: 90 } }}
+            />
+          </Tabs>
+        </nav>
 
         <TabPanel value={state.activeTab} index={0}>
           <ScannerDashboard 

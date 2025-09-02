@@ -252,7 +252,7 @@ class TestValidationResult:
     
     def test_validation_result_creation(self):
         """Test creating ValidationResult."""
-        errors = [ValidationError(field="test", message="Test error", code="TEST_ERROR")]
+        errors = [ValidationError("test", "Test error", "TEST_ERROR")]
         result = ValidationResult(
             is_valid=False,
             errors=errors,
@@ -284,10 +284,10 @@ class TestValidationError:
     def test_validation_error_creation(self):
         """Test creating ValidationError."""
         error = ValidationError(
-            field="test_field",
-            message="Test error message",
-            code="TEST_ERROR",
-            value="invalid_value"
+            "test_field",
+            "Test error message",
+            "TEST_ERROR",
+            "invalid_value"
         )
         
         assert error.field == "test_field"

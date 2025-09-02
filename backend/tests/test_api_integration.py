@@ -153,7 +153,7 @@ class TestScanEndpoints:
         
         response = client.post("/scan/", json=request_data)
         
-        assert response.status_code == 400
+        assert response.status_code == 422  # Validation error should return 422
         assert "Invalid settings" in response.json()["detail"]
     
     @patch('backend.app.services.scanner_service.ScannerService.scan_stocks')
@@ -276,7 +276,7 @@ class TestBacktestEndpoints:
     
     def test_run_backtest_future_date(self):
         """Test backtest with future end date."""
-        future_date = (date.today() + timedelta(days=1)).isoformat()
+        future_date = (date.today() + timedelta(days=30)).isoformat()  # Clearly in the future
         
         request_data = {
             "symbols": ["AAPL"],
@@ -404,18 +404,20 @@ class TestSettingsEndpoints:
         """Test partial settings update."""
         self.setUp()
         
-        # First update some settings
-        client.put("/settings/", json={"atr_multiplier": 3.0})
-        
-        # Then update only one setting
-        response = client.put("/settings/", json={"ema5_rising_threshold": 0.03})
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["atr_multiplier"] == 3.0  # Should remain from previous update
-        assert data["ema5_rising_threshold"] == 0.03  # Should be updated
-        
-        self.tearDown()
+        try:
+            # First update some settings
+            response1 = client.put("/settings/", json={"atr_multiplier": 3.0})
+            assert response1.status_code == 200
+            
+            # Then update only one setting
+            response = client.put("/settings/", json={"ema5_rising_threshold": 0.03})
+            
+            assert response.status_code == 200
+            data = response.json()
+            assert data["atr_multiplier"] == 3.0  # Should remain from previous update
+            assert data["ema5_rising_threshold"] == 0.03  # Should be updated
+        finally:
+            self.tearDown()
     
     def test_update_settings_invalid_values(self):
         """Test settings update with invalid values."""

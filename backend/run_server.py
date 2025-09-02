@@ -4,19 +4,24 @@ Script to run the FastAPI development server.
 """
 import uvicorn
 from app.main import app
+from app.config import get_settings
 
 if __name__ == "__main__":
+    settings = get_settings()
+    
     print("Starting Stock Scanner API server...")
+    print(f"Environment: {settings.environment}")
+    print(f"Debug mode: {settings.debug}")
     print("API Documentation will be available at:")
-    print("  - Swagger UI: http://localhost:8000/docs")
-    print("  - ReDoc: http://localhost:8000/redoc")
-    print("  - OpenAPI JSON: http://localhost:8000/openapi.json")
+    print(f"  - Swagger UI: http://{settings.api_host}:{settings.api_port}/docs")
+    print(f"  - ReDoc: http://{settings.api_host}:{settings.api_port}/redoc")
+    print(f"  - OpenAPI JSON: http://{settings.api_host}:{settings.api_port}/openapi.json")
     print("\nPress Ctrl+C to stop the server")
     
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=settings.debug,
+        log_level=settings.log_level.lower()
     )

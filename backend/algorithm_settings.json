@@ -1,9 +1,0 @@
-{
-  "atr_multiplier": 2.0,
-  "ema5_rising_threshold": 0.02,
-  "ema8_rising_threshold": 0.01,
-  "ema21_rising_threshold": 0.005,
-  "volatility_filter": 1.5,
-  "fomo_filter": 1.0,
-  "higher_timeframe": "15m"
-}

@@ -11,7 +11,7 @@ from typing import List
 from backend.app.services.backtest_service import BacktestService, BacktestFilters, TradeSimulation
 from backend.app.services.data_service import DataService
 from backend.app.services.algorithm_engine import AlgorithmEngine
-from backend.app.models.market_data import MarketData
+from backend.app.models.market_data import MarketData, TechnicalIndicators
 from backend.app.models.signals import Signal, AlgorithmSettings
 from backend.app.models.results import BacktestResult, Trade, PerformanceMetrics
 
@@ -75,12 +75,16 @@ def realistic_signals():
             timestamp=datetime(2024, 1, 15),
             price=151.5,
             confidence=0.85,
-            indicators={
-                "ema_5": 151.0,
-                "ema_8": 150.5,
-                "atr": 2.5
-            },
-            conditions_met=["polar_formation", "ema_alignment", "rising_emas"]
+            indicators=TechnicalIndicators(
+                ema5=151.0,
+                ema8=150.5,
+                ema13=150.0,
+                ema21=149.5,
+                ema50=149.0,
+                atr=2.5,
+                atr_long_line=149.0,
+                atr_short_line=154.0
+            )
         ),
         # Short signal in the middle
         Signal(
@@ -89,12 +93,16 @@ def realistic_signals():
             timestamp=datetime(2024, 2, 15),
             price=158.0,
             confidence=0.75,
-            indicators={
-                "ema_5": 158.5,
-                "ema_8": 159.0,
-                "atr": 3.0
-            },
-            conditions_met=["polar_formation", "ema_alignment", "falling_emas"]
+            indicators=TechnicalIndicators(
+                ema5=158.5,
+                ema8=159.0,
+                ema13=159.5,
+                ema21=160.0,
+                ema50=160.5,
+                atr=3.0,
+                atr_long_line=155.0,
+                atr_short_line=161.0
+            )
         ),
         # Another long signal later
         Signal(
@@ -103,12 +111,16 @@ def realistic_signals():
             timestamp=datetime(2024, 3, 1),
             price=162.0,
             confidence=0.90,
-            indicators={
-                "ema_5": 161.5,
-                "ema_8": 161.0,
-                "atr": 2.8
-            },
-            conditions_met=["polar_formation", "ema_alignment", "rising_emas", "htf_confirmation"]
+            indicators=TechnicalIndicators(
+                ema5=161.5,
+                ema8=161.0,
+                ema13=160.5,
+                ema21=160.0,
+                ema50=159.5,
+                atr=2.8,
+                atr_long_line=159.2,
+                atr_short_line=164.8
+            )
         )
     ]
 
@@ -192,9 +204,12 @@ class TestBacktestServiceIntegration:
         
         # Custom algorithm settings
         custom_settings = AlgorithmSettings(
-            ema_periods=[5, 8, 13],
-            atr_period=10,
             atr_multiplier=2.5,
+            ema5_rising_threshold=0.03,
+            ema8_rising_threshold=0.02,
+            ema21_rising_threshold=0.01,
+            volatility_filter=1.8,
+            fomo_filter=1.2,
             higher_timeframe="15m"
         )
         
@@ -295,8 +310,16 @@ class TestBacktestServiceIntegration:
                     timestamp=market_data.timestamp,
                     price=market_data.close,
                     confidence=0.8,
-                    indicators={},
-                    conditions_met=[]
+                    indicators=TechnicalIndicators(
+                        ema5=market_data.close,
+                        ema8=market_data.close - 0.5,
+                        ema13=market_data.close - 1.0,
+                        ema21=market_data.close - 1.5,
+                        ema50=market_data.close - 2.0,
+                        atr=2.0,
+                        atr_long_line=market_data.close - 2.0,
+                        atr_short_line=market_data.close + 2.0
+                    )
                 )]
             return []
         
@@ -388,8 +411,16 @@ class TestBacktestServiceIntegration:
                     timestamp=market_data.timestamp,
                     price=market_data.close,
                     confidence=0.8,
-                    indicators={},
-                    conditions_met=[]
+                    indicators=TechnicalIndicators(
+                        ema5=market_data.close,
+                        ema8=market_data.close - 0.5,
+                        ema13=market_data.close - 1.0,
+                        ema21=market_data.close - 1.5,
+                        ema50=market_data.close - 2.0,
+                        atr=2.0,
+                        atr_long_line=market_data.close - 2.0,
+                        atr_short_line=market_data.close + 2.0
+                    )
                 )]
             return []
         
@@ -457,9 +488,12 @@ class TestBacktestServiceIntegration:
                 "sharpe_ratio": 0.0
             }
             mock_backtest.settings_used = {
-                "ema_periods": [5, 8, 13, 21, 50],
-                "atr_period": 14,
                 "atr_multiplier": 2.0,
+                "ema5_rising_threshold": 0.02,
+                "ema8_rising_threshold": 0.01,
+                "ema21_rising_threshold": 0.005,
+                "volatility_filter": 1.5,
+                "fomo_filter": 1.0,
                 "higher_timeframe": "15m"
             }
             

@@ -9,13 +9,6 @@ import {
   CircularProgress,
   Alert,
   Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Chip,
   Tabs,
   Tab,
@@ -28,10 +21,14 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  useMediaQuery,
+  useTheme,
+  Stack,
 } from '@mui/material';
 import { Search, Visibility, Refresh } from '@mui/icons-material';
 import { ApiService, handleApiError } from '../services/api';
 import { ScanResult, BacktestResult, HistoryFilters } from '../types';
+import ResponsiveTable from './ResponsiveTable';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -41,7 +38,12 @@ interface TabPanelProps {
 
 const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
   return (
-    <div hidden={value !== index}>
+    <div 
+      role="tabpanel"
+      hidden={value !== index}
+      id={`history-tabpanel-${index}`}
+      aria-labelledby={`history-tab-${index}`}
+    >
       {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
     </div>
   );
@@ -53,6 +55,8 @@ const HistoryViewer: React.FC = () => {
   const [backtestHistory, setBacktestHistory] = useState<BacktestResult[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   // Filters
   const [filters, setFilters] = useState<HistoryFilters>({});
@@ -64,7 +68,7 @@ const HistoryViewer: React.FC = () => {
   // Pagination
   const [scanPage, setScanPage] = useState<number>(1);
   const [backtestPage, setBacktestPage] = useState<number>(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = isMobile ? 5 : 10;
   
   // Detail dialog
   const [selectedItem, setSelectedItem] = useState<ScanResult | BacktestResult | null>(null);
@@ -180,21 +184,241 @@ const HistoryViewer: React.FC = () => {
     return 'signals_found' in item;
   };
 
+  // Define table columns for scan history
+  const scanHistoryColumns = [
+    { 
+      id: 'timestamp', 
+      label: 'Date/Time', 
+      priority: 1,
+      format: formatDateTime
+    },
+    { 
+      id: 'symbols_scanned_count', 
+      label: 'Symbols', 
+      priority: 2,
+      format: (value: number) => `${value} symbols`
+    },
+    { 
+      id: 'signals_found_count', 
+      label: 'Signals', 
+      priority: 1,
+      format: (value: number) => `${value} signals`
+    },
+    { 
+      id: 'execution_time', 
+      label: 'Time', 
+      priority: 3,
+      hideOnMobile: true,
+      format: (value: number) => `${value.toFixed(2)}s`
+    },
+  ];
+
+  // Define table columns for backtest history
+  const backtestHistoryColumns = [
+    { 
+      id: 'timestamp', 
+      label: 'Date/Time', 
+      priority: 1,
+      format: formatDateTime
+    },
+    { 
+      id: 'period', 
+      label: 'Period', 
+      priority: 3,
+      hideOnMobile: true,
+      format: (value: string) => value
+    },
+    { 
+      id: 'symbols_count', 
+      label: 'Symbols', 
+      priority: 2,
+      format: (value: number) => `${value} symbols`
+    },
+    { 
+      id: 'total_trades', 
+      label: 'Trades', 
+      priority: 2,
+      format: (value: number) => value.toString()
+    },
+    { 
+      id: 'win_rate', 
+      label: 'Win Rate', 
+      priority: 1,
+      format: formatPercentage
+    },
+    { 
+      id: 'total_return', 
+      label: 'Return', 
+      priority: 1,
+      format: formatPercentage
+    },
+  ];
+
+  // Transform scan history for table display
+  const getScanHistoryRows = () => {
+    return getPaginatedScans().map((scan: ScanResult) => ({
+      id: scan.id,
+      timestamp: scan.timestamp,
+      symbols_scanned_count: scan.symbols_scanned.length,
+      signals_found_count: scan.signals_found.length,
+      execution_time: scan.execution_time,
+      _original: scan
+    }));
+  };
+
+  // Transform backtest history for table display
+  const getBacktestHistoryRows = () => {
+    return getPaginatedBacktests().map((backtest: BacktestResult) => ({
+      id: backtest.id,
+      timestamp: backtest.timestamp,
+      period: `${backtest.start_date} to ${backtest.end_date}`,
+      symbols_count: backtest.symbols.length,
+      total_trades: backtest.performance.total_trades,
+      win_rate: backtest.performance.win_rate,
+      total_return: backtest.performance.total_return,
+      _original: backtest
+    }));
+  };
+
+  // Mobile card renderer for scan history
+  const renderScanCard = (row: any, index: number) => (
+    <Box key={index}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          {formatDateTime(row.timestamp)}
+        </Typography>
+        <Button
+          size="small"
+          startIcon={<Visibility />}
+          onClick={() => viewDetails(row._original)}
+          aria-label={`View scan details from ${formatDateTime(row.timestamp)}`}
+        >
+          View
+        </Button>
+      </Box>
+      <Grid container spacing={1}>
+        <Grid item xs={4}>
+          <Typography variant="body2" color="text.secondary">
+            Symbols
+          </Typography>
+          <Chip 
+            label={`${row.symbols_scanned_count}`} 
+            size="small" 
+            variant="outlined"
+          />
+        </Grid>
+        <Grid item xs={4}>
+          <Typography variant="body2" color="text.secondary">
+            Signals
+          </Typography>
+          <Chip 
+            label={`${row.signals_found_count}`}
+            color={row.signals_found_count > 0 ? 'success' : 'default'}
+            size="small"
+          />
+        </Grid>
+        <Grid item xs={4}>
+          <Typography variant="body2" color="text.secondary">
+            Time
+          </Typography>
+          <Typography variant="body2">
+            {row.execution_time.toFixed(2)}s
+          </Typography>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+
+  // Mobile card renderer for backtest history
+  const renderBacktestCard = (row: any, index: number) => (
+    <Box key={index}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          {formatDateTime(row.timestamp)}
+        </Typography>
+        <Button
+          size="small"
+          startIcon={<Visibility />}
+          onClick={() => viewDetails(row._original)}
+          aria-label={`View backtest details from ${formatDateTime(row.timestamp)}`}
+        >
+          View
+        </Button>
+      </Box>
+      <Grid container spacing={1}>
+        <Grid item xs={6}>
+          <Typography variant="body2" color="text.secondary">
+            Win Rate
+          </Typography>
+          <Typography 
+            variant="body1" 
+            fontWeight="bold"
+            color={row.win_rate >= 0.5 ? 'success.main' : 'error.main'}
+          >
+            {formatPercentage(row.win_rate)}
+          </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="body2" color="text.secondary">
+            Return
+          </Typography>
+          <Typography 
+            variant="body1" 
+            fontWeight="bold"
+            color={row.total_return >= 0 ? 'success.main' : 'error.main'}
+          >
+            {formatPercentage(row.total_return)}
+          </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="body2" color="text.secondary">
+            Trades
+          </Typography>
+          <Typography variant="body2">
+            {row.total_trades}
+          </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="body2" color="text.secondary">
+            Symbols
+          </Typography>
+          <Typography variant="body2">
+            {row.symbols_count}
+          </Typography>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+      <Typography 
+        variant="h4" 
+        component="h1"
+        gutterBottom
+        sx={{ 
+          fontSize: { xs: '1.5rem', sm: '2.125rem' },
+          textAlign: { xs: 'center', sm: 'left' }
+        }}
+        id="history-title"
+      >
         History Viewer
       </Typography>
+      
+      {/* Screen reader announcement */}
+      <div className="sr-only" aria-live="polite">
+        History viewer loaded. Use filters to search through past scans and backtests.
+      </div>
 
       {/* Filters */}
-      <Card sx={{ mb: 3 }}>
+      <Card sx={{ mb: 3 }} role="region" aria-labelledby="filters-title">
         <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Filters
+          <Typography variant="h6" component="h2" gutterBottom id="filters-title">
+            Search Filters
           </Typography>
           
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={2}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
                 label="Symbol"
@@ -202,15 +426,20 @@ const HistoryViewer: React.FC = () => {
                 onChange={(e) => setSymbolFilter(e.target.value)}
                 placeholder="AAPL"
                 size="small"
+                inputProps={{
+                  'aria-label': 'Filter by stock symbol',
+                }}
               />
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
-                <InputLabel>Signal Type</InputLabel>
+                <InputLabel id="signal-type-filter-label">Signal Type</InputLabel>
                 <Select
+                  labelId="signal-type-filter-label"
                   value={signalTypeFilter}
                   onChange={(e) => setSignalTypeFilter(e.target.value)}
                   label="Signal Type"
+                  aria-label="Filter by signal type"
                 >
                   <MenuItem value="all">All</MenuItem>
                   <MenuItem value="long">Long</MenuItem>
@@ -218,7 +447,7 @@ const HistoryViewer: React.FC = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
                 label="Start Date"
@@ -227,9 +456,12 @@ const HistoryViewer: React.FC = () => {
                 onChange={(e) => setStartDateFilter(e.target.value)}
                 InputLabelProps={{ shrink: true }}
                 size="small"
+                inputProps={{
+                  'aria-label': 'Filter start date',
+                }}
               />
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} sm={6} md={3}>
               <TextField
                 fullWidth
                 label="End Date"
@@ -238,34 +470,72 @@ const HistoryViewer: React.FC = () => {
                 onChange={(e) => setEndDateFilter(e.target.value)}
                 InputLabelProps={{ shrink: true }}
                 size="small"
+                inputProps={{
+                  'aria-label': 'Filter end date',
+                }}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<Search />}
-                  onClick={applyFilters}
-                  disabled={isLoading}
-                >
-                  Apply Filters
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={clearFilters}
-                  disabled={isLoading}
-                >
-                  Clear
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<Refresh />}
-                  onClick={loadHistory}
-                  disabled={isLoading}
-                >
-                  Refresh
-                </Button>
-              </Box>
+            <Grid item xs={12}>
+              {isMobile ? (
+                <Stack spacing={1}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<Search />}
+                    onClick={applyFilters}
+                    disabled={isLoading}
+                  >
+                    Apply Filters
+                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={clearFilters}
+                      disabled={isLoading}
+                      sx={{ flex: 1 }}
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Refresh />}
+                      onClick={loadHistory}
+                      disabled={isLoading}
+                      sx={{ flex: 1 }}
+                      aria-label="Refresh history data"
+                    >
+                      Refresh
+                    </Button>
+                  </Box>
+                </Stack>
+              ) : (
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<Search />}
+                    onClick={applyFilters}
+                    disabled={isLoading}
+                  >
+                    Apply Filters
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={clearFilters}
+                    disabled={isLoading}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Refresh />}
+                    onClick={loadHistory}
+                    disabled={isLoading}
+                    aria-label="Refresh history data"
+                  >
+                    Refresh
+                  </Button>
+                </Box>
+              )}
             </Grid>
           </Grid>
         </CardContent>
@@ -273,7 +543,13 @@ const HistoryViewer: React.FC = () => {
 
       {/* Error Display */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+        <Alert 
+          severity="error" 
+          sx={{ mb: 3 }} 
+          onClose={() => setError('')}
+          role="alert"
+          aria-live="polite"
+        >
           {error}
         </Alert>
       )}
@@ -281,74 +557,55 @@ const HistoryViewer: React.FC = () => {
       {/* Loading Indicator */}
       {isLoading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <CircularProgress />
+          <CircularProgress aria-label="Loading history data" />
         </Box>
       )}
 
       {/* Tabs */}
       <Card>
         <CardContent>
-          <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
-            <Tab label={`Scan History (${scanHistory.length})`} />
-            <Tab label={`Backtest History (${backtestHistory.length})`} />
+          <Tabs 
+            value={activeTab} 
+            onChange={(_, newValue) => setActiveTab(newValue)}
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons={isMobile ? "auto" : false}
+            allowScrollButtonsMobile
+            aria-label="History type tabs"
+          >
+            <Tab 
+              label={`Scan History (${scanHistory.length})`}
+              id="history-tab-0"
+              aria-controls="history-tabpanel-0"
+            />
+            <Tab 
+              label={`Backtest History (${backtestHistory.length})`}
+              id="history-tab-1"
+              aria-controls="history-tabpanel-1"
+            />
           </Tabs>
 
           {/* Scan History Tab */}
           <TabPanel value={activeTab} index={0}>
             {scanHistory.length === 0 ? (
-              <Alert severity="info">No scan history found.</Alert>
+              <Alert severity="info" role="status">No scan history found.</Alert>
             ) : (
               <>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date/Time</TableCell>
-                        <TableCell>Symbols Scanned</TableCell>
-                        <TableCell>Signals Found</TableCell>
-                        <TableCell>Execution Time</TableCell>
-                        <TableCell>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {getPaginatedScans().map((scan: ScanResult) => (
-                        <TableRow key={scan.id}>
-                          <TableCell>{formatDateTime(scan.timestamp)}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={`${scan.symbols_scanned.length} symbols`} 
-                              size="small" 
-                              variant="outlined"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={`${scan.signals_found.length} signals`}
-                              color={scan.signals_found.length > 0 ? 'success' : 'default'}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>{scan.execution_time.toFixed(2)}s</TableCell>
-                          <TableCell>
-                            <Button
-                              size="small"
-                              startIcon={<Visibility />}
-                              onClick={() => viewDetails(scan)}
-                            >
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                <ResponsiveTable
+                  columns={scanHistoryColumns}
+                  rows={getScanHistoryRows()}
+                  ariaLabel="Scan history table"
+                  mobileCardView={true}
+                  renderMobileCard={renderScanCard}
+                  stickyHeader={false}
+                />
                 
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                   <Pagination
                     count={Math.ceil(scanHistory.length / itemsPerPage)}
                     page={scanPage}
                     onChange={(_, page) => setScanPage(page)}
+                    size={isMobile ? "small" : "medium"}
+                    aria-label="Scan history pagination"
                   />
                 </Box>
               </>
@@ -358,71 +615,25 @@ const HistoryViewer: React.FC = () => {
           {/* Backtest History Tab */}
           <TabPanel value={activeTab} index={1}>
             {backtestHistory.length === 0 ? (
-              <Alert severity="info">No backtest history found.</Alert>
+              <Alert severity="info" role="status">No backtest history found.</Alert>
             ) : (
               <>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date/Time</TableCell>
-                        <TableCell>Period</TableCell>
-                        <TableCell>Symbols</TableCell>
-                        <TableCell>Total Trades</TableCell>
-                        <TableCell>Win Rate</TableCell>
-                        <TableCell>Total Return</TableCell>
-                        <TableCell>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {getPaginatedBacktests().map((backtest: BacktestResult) => (
-                        <TableRow key={backtest.id}>
-                          <TableCell>{formatDateTime(backtest.timestamp)}</TableCell>
-                          <TableCell>
-                            {backtest.start_date} to {backtest.end_date}
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={`${backtest.symbols.length} symbols`} 
-                              size="small" 
-                              variant="outlined"
-                            />
-                          </TableCell>
-                          <TableCell>{backtest.performance.total_trades}</TableCell>
-                          <TableCell>
-                            <Typography 
-                              color={backtest.performance.win_rate >= 0.5 ? 'success.main' : 'error.main'}
-                            >
-                              {formatPercentage(backtest.performance.win_rate)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography 
-                              color={backtest.performance.total_return >= 0 ? 'success.main' : 'error.main'}
-                            >
-                              {formatPercentage(backtest.performance.total_return)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="small"
-                              startIcon={<Visibility />}
-                              onClick={() => viewDetails(backtest)}
-                            >
-                              View
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                <ResponsiveTable
+                  columns={backtestHistoryColumns}
+                  rows={getBacktestHistoryRows()}
+                  ariaLabel="Backtest history table"
+                  mobileCardView={true}
+                  renderMobileCard={renderBacktestCard}
+                  stickyHeader={false}
+                />
                 
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                   <Pagination
                     count={Math.ceil(backtestHistory.length / itemsPerPage)}
                     page={backtestPage}
                     onChange={(_, page) => setBacktestPage(page)}
+                    size={isMobile ? "small" : "medium"}
+                    aria-label="Backtest history pagination"
                   />
                 </Box>
               </>
@@ -437,13 +648,16 @@ const HistoryViewer: React.FC = () => {
         onClose={() => setDetailDialogOpen(false)}
         maxWidth="md"
         fullWidth
+        fullScreen={isMobile}
+        aria-labelledby="detail-dialog-title"
+        aria-describedby="detail-dialog-description"
       >
-        <DialogTitle>
+        <DialogTitle id="detail-dialog-title">
           {selectedItem && isScanResult(selectedItem) ? 'Scan Details' : 'Backtest Details'}
         </DialogTitle>
         <DialogContent>
           {selectedItem && (
-            <Box sx={{ mt: 1 }}>
+            <Box sx={{ mt: 1 }} id="detail-dialog-description">
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 ID: {selectedItem.id}
               </Typography>
@@ -462,13 +676,23 @@ const HistoryViewer: React.FC = () => {
                   <Typography variant="body2" gutterBottom>
                     Signals Found: {selectedItem.signals_found.length}
                   </Typography>
-                  {selectedItem.signals_found.map((signal, index) => (
-                    <Box key={index} sx={{ ml: 2, mb: 1 }}>
-                      <Typography variant="body2">
-                        {signal.symbol} - {signal.signal_type.toUpperCase()} at {formatPrice(signal.price)}
+                  {selectedItem.signals_found.length > 0 && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="h6" gutterBottom>
+                        Signal Details:
                       </Typography>
+                      {selectedItem.signals_found.map((signal, index) => (
+                        <Box key={index} sx={{ ml: 2, mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                          <Typography variant="body2">
+                            <strong>{signal.symbol}</strong> - {signal.signal_type.toUpperCase()} at {formatPrice(signal.price)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Confidence: {formatPercentage(signal.confidence)}
+                          </Typography>
+                        </Box>
+                      ))}
                     </Box>
-                  ))}
+                  )}
                 </>
               ) : (
                 <>
@@ -487,13 +711,25 @@ const HistoryViewer: React.FC = () => {
                   <Typography variant="body2" gutterBottom>
                     Total Return: {formatPercentage(selectedItem.performance.total_return)}
                   </Typography>
+                  <Typography variant="body2" gutterBottom>
+                    Max Drawdown: {formatPercentage(selectedItem.performance.max_drawdown)}
+                  </Typography>
+                  <Typography variant="body2" gutterBottom>
+                    Sharpe Ratio: {selectedItem.performance.sharpe_ratio.toFixed(2)}
+                  </Typography>
                 </>
               )}
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDetailDialogOpen(false)}>Close</Button>
+          <Button 
+            onClick={() => setDetailDialogOpen(false)}
+            autoFocus
+            aria-label="Close dialog"
+          >
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

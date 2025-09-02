@@ -20,7 +20,10 @@ class ErrorHandler:
 
 class ValidationError(Exception):
     """Validation error."""
-    pass
+    def __init__(self, message, recovery_suggestions=None):
+        super().__init__(message)
+        self.message = message
+        self.recovery_suggestions = recovery_suggestions or []
 
 class StockScannerError(Exception):
     """Base error."""

@@ -10,7 +10,7 @@ from typing import List
 from backend.app.services.backtest_service import BacktestService, BacktestFilters, TradeSimulation
 from backend.app.services.data_service import DataService
 from backend.app.services.algorithm_engine import AlgorithmEngine
-from backend.app.models.market_data import MarketData
+from backend.app.models.market_data import MarketData, TechnicalIndicators
 from backend.app.models.signals import Signal, AlgorithmSettings
 from backend.app.models.results import BacktestResult, Trade, PerformanceMetrics
 
@@ -55,28 +55,36 @@ def sample_signals():
         Signal(
             symbol="AAPL",
             signal_type="long",
-            timestamp=datetime(2024, 1, 60),  # Day 60
+            timestamp=datetime(2024, 3, 1),  # Fixed: valid date
             price=180.0,
             confidence=0.85,
-            indicators={
-                "ema_5": 179.5,
-                "ema_8": 179.0,
-                "atr": 3.0
-            },
-            conditions_met=["polar_formation", "ema_alignment"]
+            indicators=TechnicalIndicators(
+                ema5=179.5,
+                ema8=179.0,
+                ema13=178.5,
+                ema21=178.0,
+                ema50=177.0,
+                atr=3.0,
+                atr_long_line=175.0,
+                atr_short_line=181.0
+            )
         ),
         Signal(
             symbol="AAPL",
             signal_type="short",
-            timestamp=datetime(2024, 1, 80),  # Day 80
+            timestamp=datetime(2024, 3, 20),  # Fixed: valid date
             price=190.0,
             confidence=0.75,
-            indicators={
-                "ema_5": 190.5,
-                "ema_8": 191.0,
-                "atr": 3.5
-            },
-            conditions_met=["polar_formation", "ema_alignment"]
+            indicators=TechnicalIndicators(
+                ema5=190.5,
+                ema8=191.0,
+                ema13=191.5,
+                ema21=192.0,
+                ema50=193.0,
+                atr=3.5,
+                atr_long_line=186.5,
+                atr_short_line=193.5
+            )
         )
     ]
 
@@ -134,10 +142,10 @@ class TestBacktestService:
         # Mock algorithm engine to return signals at specific points
         def mock_generate_signals(*args, **kwargs):
             market_data = kwargs.get('market_data') or args[0]
-            # Return long signal on day 60, short signal on day 80
-            if market_data.timestamp.day == 60:
+            # Return long signal on day 1, short signal on day 20
+            if market_data.timestamp.day == 1:
                 return [sample_signals[0]]
-            elif market_data.timestamp.day == 80:
+            elif market_data.timestamp.day == 20:
                 return [sample_signals[1]]
             return []
         
@@ -263,8 +271,8 @@ class TestBacktestService:
         assert metrics.winning_trades == 2
         assert metrics.losing_trades == 1
         assert abs(metrics.win_rate - 0.6667) < 0.001  # 2/3
-        assert abs(metrics.total_return - 0.0902) < 0.001  # Sum of pnl_percent
-        assert abs(metrics.average_return - 0.0301) < 0.001  # Average pnl_percent
+        assert abs(metrics.total_return - 0.0802) < 0.001  # Sum of pnl_percent: 0.05 + (-0.0286) + 0.0588
+        assert abs(metrics.average_return - 0.0267) < 0.001  # Average pnl_percent: 0.0802 / 3
         assert metrics.max_drawdown >= 0.0
         assert metrics.sharpe_ratio != 0.0
     
@@ -342,8 +350,16 @@ class TestBacktestService:
             timestamp=datetime.now(),
             price=150.0,
             confidence=0.8,
-            indicators={},
-            conditions_met=[]
+            indicators=TechnicalIndicators(
+                ema5=150.0,
+                ema8=149.5,
+                ema13=149.0,
+                ema21=148.5,
+                ema50=148.0,
+                atr=2.0,
+                atr_long_line=148.0,
+                atr_short_line=152.0
+            )
         )
         
         market_data = MarketData(
@@ -386,8 +402,16 @@ class TestBacktestService:
             timestamp=datetime.now(),
             price=155.0,
             confidence=0.8,
-            indicators={},
-            conditions_met=[]
+            indicators=TechnicalIndicators(
+                ema5=155.0,
+                ema8=155.5,
+                ema13=156.0,
+                ema21=156.5,
+                ema50=157.0,
+                atr=2.0,
+                atr_long_line=153.0,
+                atr_short_line=157.0
+            )
         )
         
         market_data = MarketData(
@@ -422,8 +446,16 @@ class TestBacktestService:
             timestamp=datetime.now(),
             price=140.0,
             confidence=0.5,
-            indicators={},
-            conditions_met=[]
+            indicators=TechnicalIndicators(
+                ema5=140.0,
+                ema8=139.5,
+                ema13=139.0,
+                ema21=138.5,
+                ema50=138.0,
+                atr=2.0,
+                atr_long_line=138.0,
+                atr_short_line=142.0
+            )
         )
         
         # Market data showing loss
@@ -488,8 +520,16 @@ class TestBacktestService:
             timestamp=datetime.now(),
             price=150.0,
             confidence=0.8,
-            indicators={},
-            conditions_met=[]
+            indicators=TechnicalIndicators(
+                ema5=150.0,
+                ema8=149.5,
+                ema13=149.0,
+                ema21=148.5,
+                ema50=148.0,
+                atr=2.0,
+                atr_long_line=148.0,
+                atr_short_line=152.0
+            )
         )
         
         market_data = MarketData(

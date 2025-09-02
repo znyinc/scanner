@@ -16,6 +16,9 @@ import {
   Divider,
   Tooltip,
   IconButton,
+  useMediaQuery,
+  useTheme,
+  Stack,
 } from '@mui/material';
 import { Save, RestoreFromTrash, Info } from '@mui/icons-material';
 import { ApiService, handleApiError } from '../services/api';
@@ -39,6 +42,8 @@ const SettingsPanel: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
   const [hasChanges, setHasChanges] = useState<boolean>(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     loadSettings();
@@ -149,37 +154,72 @@ const SettingsPanel: React.FC = () => {
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-        <CircularProgress />
+        <CircularProgress aria-label="Loading settings" />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+      <Typography 
+        variant="h4" 
+        component="h1"
+        gutterBottom
+        sx={{ 
+          fontSize: { xs: '1.5rem', sm: '2.125rem' },
+          textAlign: { xs: 'center', sm: 'left' }
+        }}
+        id="settings-title"
+      >
         Algorithm Settings
       </Typography>
 
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography 
+        variant="body1" 
+        color="text.secondary" 
+        sx={{ 
+          mb: 3,
+          textAlign: { xs: 'center', sm: 'left' },
+          fontSize: { xs: '0.875rem', sm: '1rem' }
+        }}
+      >
         Configure the parameters for the EMA-ATR trading algorithm. Changes will affect all future scans and backtests.
       </Typography>
+      
+      {/* Screen reader announcement */}
+      <div className="sr-only" aria-live="polite">
+        Algorithm settings panel loaded. Configure trading parameters below.
+      </div>
 
       {/* Error and Success Messages */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+        <Alert 
+          severity="error" 
+          sx={{ mb: 3 }} 
+          onClose={() => setError('')}
+          role="alert"
+          aria-live="polite"
+        >
           {error}
         </Alert>
       )}
       
       {success && (
-        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccess('')}>
+        <Alert 
+          severity="success" 
+          sx={{ mb: 3 }} 
+          onClose={() => setSuccess('')}
+          role="status"
+          aria-live="polite"
+        >
           {success}
         </Alert>
       )}
 
-      <Card>
+      <Card role="region" aria-labelledby="settings-title">
         <CardContent>
-          <Grid container spacing={3}>
+          <Box component="form" role="form" aria-labelledby="settings-title">
+            <Grid container spacing={3}>
             {/* ATR Settings */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom>
@@ -349,40 +389,58 @@ const SettingsPanel: React.FC = () => {
               </Box>
             </Grid>
 
-            {/* Action Buttons */}
-            <Grid item xs={12}>
-              <Divider sx={{ my: 2 }} />
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                <Button
-                  variant="outlined"
-                  onClick={resetToDefaults}
-                  startIcon={<RestoreFromTrash />}
-                  disabled={isSaving}
-                >
-                  Reset to Defaults
-                </Button>
-                
-                {hasChanges && (
+              {/* Action Buttons */}
+              <Grid item xs={12}>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ 
+                  display: 'flex', 
+                  gap: 2, 
+                  justifyContent: { xs: 'center', sm: 'flex-end' },
+                  flexDirection: { xs: 'column', sm: 'row' }
+                }}>
                   <Button
                     variant="outlined"
-                    onClick={discardChanges}
+                    onClick={resetToDefaults}
+                    startIcon={<RestoreFromTrash />}
                     disabled={isSaving}
+                    fullWidth={isMobile}
+                    sx={{ minHeight: { xs: 48, sm: 'auto' } }}
+                    aria-label="Reset all settings to default values"
                   >
-                    Discard Changes
+                    Reset to Defaults
                   </Button>
-                )}
-                
-                <Button
-                  variant="contained"
-                  onClick={saveSettings}
-                  startIcon={isSaving ? <CircularProgress size={20} /> : <Save />}
-                  disabled={isSaving || !hasChanges}
-                >
-                  {isSaving ? 'Saving...' : 'Save Settings'}
-                </Button>
-              </Box>
+                  
+                  {hasChanges && (
+                    <Button
+                      variant="outlined"
+                      onClick={discardChanges}
+                      disabled={isSaving}
+                      fullWidth={isMobile}
+                      sx={{ minHeight: { xs: 48, sm: 'auto' } }}
+                      aria-label="Discard unsaved changes"
+                    >
+                      Discard Changes
+                    </Button>
+                  )}
+                  
+                  <Button
+                    variant="contained"
+                    onClick={saveSettings}
+                    startIcon={isSaving ? <CircularProgress size={20} /> : <Save />}
+                    disabled={isSaving || !hasChanges}
+                    fullWidth={isMobile}
+                    sx={{ 
+                      minHeight: { xs: 48, sm: 'auto' },
+                      fontWeight: 600
+                    }}
+                    aria-label={hasChanges ? 'Save current settings' : 'No changes to save'}
+                  >
+                    {isSaving ? 'Saving...' : 'Save Settings'}
+                  </Button>
+                </Box>
+              </Grid>
             </Grid>
-          </Grid>
+          </Box>
         </CardContent>
       </Card>
     </Box>

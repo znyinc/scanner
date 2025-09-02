@@ -128,7 +128,7 @@ class BacktestService:
                 symbol_data = historical_data.get(symbol, [])
                 symbol_htf_data = htf_data.get(symbol, [])
                 
-                if not symbol_data:
+                if symbol_data is None or (hasattr(symbol_data, 'empty') and symbol_data.empty):
                     logger.warning(f"No historical data available for {symbol}")
                     continue
                 
@@ -773,9 +773,14 @@ class BacktestService:
                 symbol_performance = {}
                 
                 for backtest in backtests:
-                    performance = PerformanceMetrics.from_dict(backtest.performance)
-                    win_rates.append(performance.win_rate)
-                    returns.append(performance.total_return)
+                    try:
+                        performance = PerformanceMetrics.from_dict(backtest.performance)
+                        win_rates.append(performance.win_rate)
+                        returns.append(performance.total_return)
+                    except Exception as e:
+                        logger.warning(f"Error parsing performance data for backtest {backtest.id}: {str(e)}")
+                        # Skip this backtest if performance data is invalid
+                        continue
                     
                     # Count symbol usage
                     for symbol in backtest.symbols:

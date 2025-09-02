@@ -435,39 +435,41 @@ class AlgorithmSettingsValidator:
             ))
             return ValidationResult(False, errors, {}, warnings)
         
-        # Validate numeric parameters
+        # Validate numeric parameters - only validate parameters that are provided
         for param_name in cls.PARAMETER_RANGES.keys():
-            value = settings.get(param_name)
-            is_valid, error_msg, cleaned_value = cls.validate_numeric_parameter(value, param_name)
+            if param_name in settings:  # Only validate if parameter was provided
+                value = settings.get(param_name)
+                is_valid, error_msg, cleaned_value = cls.validate_numeric_parameter(value, param_name)
+                
+                if is_valid:
+                    cleaned_data[param_name] = cleaned_value
+                    # Warn if using default (when value was None but parameter was explicitly provided)
+                    if value is None:
+                        warnings.append(f"Using default value for {param_name}: {cleaned_value}")
+                else:
+                    errors.append(ValidationError(
+                        field=param_name,
+                        message=error_msg,
+                        code="INVALID_PARAMETER_VALUE",
+                        value=value
+                    ))
+        
+        # Validate timeframe - only if provided
+        if 'higher_timeframe' in settings:
+            timeframe = settings.get('higher_timeframe')
+            is_valid, error_msg, cleaned_timeframe = cls.validate_timeframe(timeframe)
             
             if is_valid:
-                cleaned_data[param_name] = cleaned_value
-                # Warn if using default
-                if value is None:
-                    warnings.append(f"Using default value for {param_name}: {cleaned_value}")
+                cleaned_data['higher_timeframe'] = cleaned_timeframe
+                if timeframe is None:
+                    warnings.append(f"Using default timeframe: {cleaned_timeframe}")
             else:
                 errors.append(ValidationError(
-                    field=param_name,
+                    field="higher_timeframe",
                     message=error_msg,
-                    code="INVALID_PARAMETER_VALUE",
-                    value=value
+                    code="INVALID_TIMEFRAME",
+                    value=timeframe
                 ))
-        
-        # Validate timeframe
-        timeframe = settings.get('higher_timeframe')
-        is_valid, error_msg, cleaned_timeframe = cls.validate_timeframe(timeframe)
-        
-        if is_valid:
-            cleaned_data['higher_timeframe'] = cleaned_timeframe
-            if timeframe is None:
-                warnings.append(f"Using default timeframe: {cleaned_timeframe}")
-        else:
-            errors.append(ValidationError(
-                field="higher_timeframe",
-                message=error_msg,
-                code="INVALID_TIMEFRAME",
-                value=timeframe
-            ))
         
         # Check for unknown parameters
         known_params = set(cls.PARAMETER_RANGES.keys()) | {'higher_timeframe'}

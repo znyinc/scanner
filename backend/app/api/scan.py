@@ -98,6 +98,12 @@ async def scan_stocks(request: ScanRequest, http_request: Request):
                 execution_time=result.execution_time
             )
             
+    except ValidationError as exc:
+        # Handle validation errors with 422 status
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc)
+        )
     except StockScannerError:
         # Re-raise our custom errors
         raise
@@ -110,11 +116,10 @@ async def scan_stocks(request: ScanRequest, http_request: Request):
         })
         ErrorHandler.log_error(error, request_id)
         
-        # Convert to HTTP exception
-        error_response = ErrorHandler.create_error_response(error)
+        # Convert to HTTP exception with more specific error message
         raise HTTPException(
-            status_code=500 if error.error_details.category.value == "system" else 400,
-            detail=error_response["error"]
+            status_code=500,
+            detail=f"Scan failed: {str(exc)}"
         )
 
 
@@ -234,6 +239,12 @@ async def get_scan_history(
                 for result in results
             ]
             
+    except ValidationError as exc:
+        # Handle validation errors with 422 status
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc)
+        )
     except StockScannerError:
         # Re-raise our custom errors
         raise
@@ -245,9 +256,8 @@ async def get_scan_history(
         })
         ErrorHandler.log_error(error, request_id)
         
-        # Convert to HTTP exception
-        error_response = ErrorHandler.create_error_response(error)
+        # Convert to HTTP exception with more specific error message
         raise HTTPException(
             status_code=500,
-            detail=error_response["error"]
+            detail=f"Failed to retrieve scan history: {str(exc)}"
         )

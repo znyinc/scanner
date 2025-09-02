@@ -133,6 +133,12 @@ async def run_backtest(request: BacktestRequest, http_request: Request):
                 settings_used=result.settings_used.to_dict()
             )
             
+    except ValidationError as exc:
+        # Handle validation errors with 422 status
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc)
+        )
     except StockScannerError:
         # Re-raise our custom errors
         raise
@@ -150,7 +156,7 @@ async def run_backtest(request: BacktestRequest, http_request: Request):
         error_response = ErrorHandler.create_error_response(error)
         raise HTTPException(
             status_code=500 if error.error_details.category.value == "system" else 400,
-            detail=error_response["error"]
+            detail=error_response["error"]["message"]
         )
 
 

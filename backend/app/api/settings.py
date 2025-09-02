@@ -89,6 +89,12 @@ async def get_settings():
                 higher_timeframe=settings.higher_timeframe
             )
             
+    except ValidationError as exc:
+        # Handle validation errors with 422 status
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc)
+        )
     except StockScannerError:
         # Re-raise our custom errors
         raise
@@ -104,7 +110,7 @@ async def get_settings():
         error_response = ErrorHandler.create_error_response(error)
         raise HTTPException(
             status_code=500,
-            detail=error_response["error"]
+            detail=error_response["error"]["message"]
         )
 
 
@@ -176,6 +182,12 @@ async def update_settings(request: SettingsRequest, http_request: Request):
                 higher_timeframe=current_settings.higher_timeframe
             )
             
+    except ValidationError as exc:
+        # Handle validation errors with 422 status
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc)
+        )
     except StockScannerError:
         # Re-raise our custom errors
         raise
@@ -192,7 +204,7 @@ async def update_settings(request: SettingsRequest, http_request: Request):
         error_response = ErrorHandler.create_error_response(error)
         raise HTTPException(
             status_code=500 if error.error_details.category.value == "system" else 400,
-            detail=error_response["error"]
+            detail=error_response["error"]["message"]
         )
 
 
