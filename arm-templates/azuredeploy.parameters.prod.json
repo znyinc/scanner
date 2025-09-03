@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "value": "stockscanner"
+    },
+    "environment": {
+      "value": "prod"
+    },
+    "dbAdminUsername": {
+      "value": "stockscanner_admin"
+    },
+    "dbAdminPassword": {
+      "value": "ChangeMe123!@#$"
+    },
+    "appServicePlanSku": {
+      "value": "P1v3"
+    },
+    "databaseSku": {
+      "value": "GP_Standard_D4s_v3"
+    },
+    "enableHighAvailability": {
+      "value": true
+    },
+    "enableRedis": {
+      "value": true
+    },
+    "enableApplicationInsights": {
+      "value": true
+    },
+    "autoscaleMinInstances": {
+      "value": 2
+    },
+    "autoscaleMaxInstances": {
+      "value": 20
+    }
+  }
+}

@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stockscanner
+  labels:
+    app: stockscanner
+    environment: production
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: database-secret
+  namespace: stockscanner
+type: Opaque
+stringData:
+  connection-string: "postgresql://username:password@server.postgres.database.azure.com:5432/stockscanner"
+  db-username: "username"
+  db-password: "password"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: stockscanner
+data:
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+  CORS_ORIGINS: "https://stockscanner.yourdomain.com"
