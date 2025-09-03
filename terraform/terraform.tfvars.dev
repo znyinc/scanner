@@ -1,0 +1,50 @@
+# Development Environment
+app_name    = "stockscanner"
+environment = "dev"
+location    = "East US 2"
+owner       = "Development Team"
+cost_center = "Engineering"
+
+# Database Configuration
+db_admin_username          = "stockscanner_admin"
+db_sku_name               = "B_Standard_B1ms"  # Basic tier for development
+db_storage_mb             = 32768              # 32GB
+db_backup_retention_days  = 7                 # Minimum retention
+enable_high_availability  = false             # Disable HA for cost savings
+
+# App Service Configuration
+app_service_sku_name = "B2"  # Basic tier for development
+
+# Auto-scaling Configuration
+autoscale_min_capacity     = 1
+autoscale_max_capacity     = 3
+autoscale_default_capacity = 1
+
+# Container Registry
+acr_sku = "Basic"
+
+# Monitoring
+log_analytics_retention_days = 30
+
+# Network Configuration
+vnet_address_space            = ["10.1.0.0/16"]
+app_subnet_address_prefixes   = ["10.1.1.0/24"]
+db_subnet_address_prefixes    = ["10.1.2.0/24"]
+appgw_subnet_address_prefixes = ["10.1.3.0/24"]
+
+# Security
+allowed_ip_ranges = ["0.0.0.0/0"]  # Open for development
+enable_waf        = false
+
+# Feature Flags
+enable_container_registry    = true
+enable_key_vault            = true
+enable_application_insights = true
+enable_front_door           = false
+enable_redis                = false  # Disable Redis for cost savings
+
+# Domain
+custom_domain = ""
+
+# Alert Configuration
+alert_email_address = "dev-team@company.com"

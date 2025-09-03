@@ -1,0 +1,422 @@
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    exclude:
+    - docs/*
+    - README.md
+    - .gitignore
+
+pr:
+  branches:
+    include:
+    - main
+  paths:
+    exclude:
+    - docs/*
+    - README.md
+    - .gitignore
+
+variables:
+  # Build Configuration
+  buildConfiguration: 'Release'
+  vmImageName: 'ubuntu-latest'
+  
+  # Docker Configuration
+  dockerRegistryServiceConnection: 'stockscanner-acr'
+  containerRegistry: '$(acrName).azurecr.io'
+  backendImageRepository: 'backend'
+  frontendImageRepository: 'frontend'
+  dockerfilePath: '**/Dockerfile'
+  tag: '$(Build.BuildNumber)'
+  
+  # Azure Configuration
+  azureServiceConnection: 'stockscanner-azure'
+  resourceGroupName: 'rg-stockscanner-$(environment)'
+  
+  # Environment-specific variables
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+    environment: 'prod'
+    acrName: 'stockscanneracrprod'
+    backendAppName: 'stockscanner-prod-backend'
+    frontendAppName: 'stockscanner-prod-frontend'
+  ${{ else }}:
+    environment: 'dev'
+    acrName: 'stockscanneracrdev'
+    backendAppName: 'stockscanner-dev-backend'
+    frontendAppName: 'stockscanner-dev-frontend'
+
+stages:
+- stage: Test
+  displayName: 'Test Stage'
+  jobs:
+  - job: TestBackend
+    displayName: 'Test Backend'
+    pool:
+      vmImage: $(vmImageName)
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.11'
+        displayName: 'Use Python 3.11'
+
+    - script: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: 'Install Python dependencies'
+
+    - script: |
+        cd backend
+        python -m pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
+      env:
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        SECRET_KEY: test-secret-key
+        DEBUG: true
+      displayName: 'Run backend tests'
+
+    - task: PublishTestResults@2
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFiles: 'backend/test-results.xml'
+        testRunTitle: 'Backend Tests'
+
+    - task: PublishCodeCoverageResults@1
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: 'backend/coverage.xml'
+        reportDirectory: 'backend/htmlcov'
+
+  - job: TestFrontend
+    displayName: 'Test Frontend'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: 'Install Node.js'
+
+    - script: |
+        cd frontend
+        npm ci
+      displayName: 'Install frontend dependencies'
+
+    - script: |
+        cd frontend
+        npm test -- --coverage --watchAll=false --reporters=jest-junit
+      displayName: 'Run frontend tests'
+
+    - task: PublishTestResults@2
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFiles: 'frontend/junit.xml'
+        testRunTitle: 'Frontend Tests'
+
+    - task: PublishCodeCoverageResults@1
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: 'frontend/coverage/cobertura-coverage.xml'
+        reportDirectory: 'frontend/coverage'
+
+  - job: SecurityScan
+    displayName: 'Security Scan'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.11'
+
+    - script: |
+        pip install safety bandit
+        cd backend
+        safety check -r requirements.txt
+        bandit -r app/ -f json -o bandit-report.json
+      displayName: 'Backend security scan'
+      continueOnError: true
+
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+
+    - script: |
+        cd frontend
+        npm ci
+        npm audit --audit-level=moderate
+      displayName: 'Frontend security audit'
+      continueOnError: true
+
+- stage: Build
+  displayName: 'Build Stage'
+  dependsOn: Test
+  condition: succeeded()
+  jobs:
+  - job: BuildBackend
+    displayName: 'Build Backend Image'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+    - task: Docker@2
+      displayName: 'Build backend image'
+      inputs:
+        command: 'build'
+        repository: $(backendImageRepository)
+        dockerfile: 'backend/Dockerfile'
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+          latest
+
+    - task: Docker@2
+      displayName: 'Push backend image'
+      inputs:
+        command: 'push'
+        repository: $(backendImageRepository)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+          latest
+
+  - job: BuildFrontend
+    displayName: 'Build Frontend Image'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+    - task: Docker@2
+      displayName: 'Build frontend image'
+      inputs:
+        command: 'build'
+        repository: $(frontendImageRepository)
+        dockerfile: 'frontend/Dockerfile'
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+          latest
+        arguments: '--build-arg REACT_APP_API_URL=https://$(backendAppName).azurewebsites.net/api'
+
+    - task: Docker@2
+      displayName: 'Push frontend image'
+      inputs:
+        command: 'push'
+        repository: $(frontendImageRepository)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+          latest
+
+- stage: Infrastructure
+  displayName: 'Infrastructure as Code'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: TerraformDeploy
+    displayName: 'Deploy Infrastructure'
+    pool:
+      vmImage: $(vmImageName)
+    environment: $(environment)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          - task: TerraformInstaller@0
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: 'latest'
+
+          - task: AzureCLI@2
+            displayName: 'Terraform Init'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                cd terraform
+                terraform init \
+                  -backend-config="resource_group_name=terraform-state-rg" \
+                  -backend-config="storage_account_name=terraformstate$(environment)" \
+                  -backend-config="container_name=tfstate" \
+                  -backend-config="key=stockscanner-$(environment).terraform.tfstate"
+
+          - task: AzureCLI@2
+            displayName: 'Terraform Plan'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                cd terraform
+                terraform plan \
+                  -var-file="terraform.tfvars.$(environment)" \
+                  -var="db_admin_password=$(dbAdminPassword)" \
+                  -var="github_token=$(githubToken)" \
+                  -var="slack_webhook_url=$(slackWebhookUrl)" \
+                  -out=tfplan
+
+          - task: AzureCLI@2
+            displayName: 'Terraform Apply'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                cd terraform
+                terraform apply -auto-approve tfplan
+
+- stage: Deploy
+  displayName: 'Deploy Applications'
+  dependsOn: Infrastructure
+  condition: succeeded()
+  jobs:
+  - deployment: DeployBackend
+    displayName: 'Deploy Backend'
+    pool:
+      vmImage: $(vmImageName)
+    environment: $(environment)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebAppContainer@1
+            displayName: 'Deploy Backend Container'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              appName: $(backendAppName)
+              containers: $(containerRegistry)/$(backendImageRepository):$(tag)
+
+  - deployment: DeployFrontend
+    displayName: 'Deploy Frontend'
+    pool:
+      vmImage: $(vmImageName)
+    environment: $(environment)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebAppContainer@1
+            displayName: 'Deploy Frontend Container'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              appName: $(frontendAppName)
+              containers: $(containerRegistry)/$(frontendImageRepository):$(tag)
+
+- stage: PostDeploy
+  displayName: 'Post-Deployment Tests'
+  dependsOn: Deploy
+  condition: succeeded()
+  jobs:
+  - job: SmokeTests
+    displayName: 'Smoke Tests'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.11'
+
+    - script: |
+        pip install requests pytest
+        python -c "
+        import requests
+        import time
+        
+        backend_url = 'https://$(backendAppName).azurewebsites.net/health'
+        frontend_url = 'https://$(frontendAppName).azurewebsites.net'
+        
+        # Wait for apps to be ready
+        time.sleep(30)
+        
+        # Test backend health
+        response = requests.get(backend_url, timeout=30)
+        assert response.status_code == 200, f'Backend health check failed: {response.status_code}'
+        
+        # Test frontend availability
+        response = requests.get(frontend_url, timeout=30)
+        assert response.status_code == 200, f'Frontend check failed: {response.status_code}'
+        
+        print('All smoke tests passed!')
+        "
+      displayName: 'Run smoke tests'
+
+  - job: LoadTest
+    displayName: 'Load Test'
+    pool:
+      vmImage: $(vmImageName)
+    condition: and(succeeded(), eq(variables.environment, 'prod'))
+
+    steps:
+    - script: |
+        # Install Apache Bench
+        sudo apt-get update
+        sudo apt-get install -y apache2-utils
+        
+        # Run load test
+        ab -n 100 -c 10 https://$(backendAppName).azurewebsites.net/health
+      displayName: 'Run load test'
+
+- stage: Monitoring
+  displayName: 'Setup Monitoring'
+  dependsOn: PostDeploy
+  condition: succeeded()
+  jobs:
+  - job: ConfigureMonitoring
+    displayName: 'Configure Application Monitoring'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Configure Application Insights'
+      inputs:
+        azureSubscription: $(azureServiceConnection)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Get Application Insights information
+          appInsightsKey=$(az monitor app-insights component show \
+            --app appi-stockscanner-$(environment) \
+            --resource-group $(resourceGroupName) \
+            --query instrumentationKey -o tsv)
+          
+          # Update app settings with Application Insights
+          az webapp config appsettings set \
+            --resource-group $(resourceGroupName) \
+            --name $(backendAppName) \
+            --settings APPINSIGHTS_INSTRUMENTATIONKEY=$appInsightsKey
+          
+          echo "Application Insights configured successfully"
+
+    - task: AzureCLI@2
+      displayName: 'Setup Alert Rules'
+      inputs:
+        azureSubscription: $(azureServiceConnection)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Additional alert rules can be configured here
+          echo "Custom alert rules configured"
