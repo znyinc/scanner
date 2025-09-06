@@ -320,9 +320,11 @@ export const useAppActions = () => {
 
     // Scan actions
     initiateScan: async (symbols: string[], settings: AlgorithmSettings, onProgress?: (progress: number, message?: string) => void) => {
+      
       dispatch({ type: 'SCAN_LOADING' });
       try {
         const result = await ApiService.initiateScan(symbols, settings, onProgress);
+        
         dispatch({ type: 'SCAN_SUCCESS', payload: result });
         dispatch({ 
           type: 'ADD_NOTIFICATION', 
@@ -333,6 +335,7 @@ export const useAppActions = () => {
         });
         return result;
       } catch (error: any) {
+
         dispatch({ type: 'SCAN_ERROR', payload: error.message });
         dispatch({ 
           type: 'ADD_NOTIFICATION', 

@@ -25,6 +25,7 @@ import {
 } from '../utils/formatters';
 import ProgressIndicator from './ProgressIndicator';
 import ResponsiveTable from './ResponsiveTable';
+import MarketDataTable from './MarketDataTable';
 
 interface ScannerDashboardProps {
   onViewHistory: () => void;
@@ -49,6 +50,11 @@ const ScannerDashboard: React.FC<ScannerDashboardProps> = ({
     }
 
     if (!state.settings) {
+      return;
+    }
+
+    // Prevent multiple concurrent scans
+    if (state.scanLoading) {
       return;
     }
 
@@ -258,7 +264,15 @@ const ScannerDashboard: React.FC<ScannerDashboardProps> = ({
             Initiate Stock Scan
           </Typography>
           
-          <Box component="form" role="form" aria-labelledby="scan-input-title">
+          <Box 
+            component="form" 
+            role="form" 
+            aria-labelledby="scan-input-title"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleScan();
+            }}
+          >
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField
@@ -296,7 +310,7 @@ const ScannerDashboard: React.FC<ScannerDashboardProps> = ({
                         fontSize: '1rem',
                         fontWeight: 600
                       }}
-                      type="submit"
+                      type="button"
                     >
                       {state.scanLoading ? 'Scanning...' : 'Start Scan'}
                     </Button>
@@ -338,7 +352,7 @@ const ScannerDashboard: React.FC<ScannerDashboardProps> = ({
                       disabled={state.scanLoading || !state.settings || state.apiStatus !== 'online'}
                       sx={{ minWidth: 120 }}
                       aria-describedby={state.scanLoading ? 'scan-loading-status' : undefined}
-                      type="submit"
+                      type="button"
                     >
                       {state.scanLoading ? 'Scanning...' : 'Start Scan'}
                     </Button>
@@ -367,6 +381,13 @@ const ScannerDashboard: React.FC<ScannerDashboardProps> = ({
           </Box>
         </CardContent>
       </Card>
+
+      {/* Market Data Verification Table */}
+      <Box sx={{ mb: 3 }}>
+        <MarketDataTable 
+          symbols={symbols.split(',').map(s => s.trim()).filter(s => s.length > 0)}
+        />
+      </Box>
 
       {/* Error Display */}
       {state.scanError && (

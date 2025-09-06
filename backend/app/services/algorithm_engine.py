@@ -19,6 +19,7 @@ class AlgorithmEngine:
     
     def __init__(self):
         self.indicator_engine = TechnicalIndicatorEngine()
+        self._last_analysis = None  # Store detailed analysis for diagnostics
     
     def _check_polar_formation_long(self, market_data: MarketData, indicators: TechnicalIndicators) -> bool:
         """
@@ -289,31 +290,48 @@ class AlgorithmEngine:
         try:
             conditions_met = 0
             total_conditions = 5  # Will be 6 if HTF data is available
+            rejection_reasons = []
+            partial_criteria = []
             
             # Check polar formation
             if self._check_polar_formation_long(market_data, indicators):
                 conditions_met += 1
+                partial_criteria.append("Bullish polar formation")
                 logger.debug(f"Long polar formation check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("Failed bullish polar formation")
             
             # Check EMA positioning
             if self._check_ema_positioning_long(indicators):
                 conditions_met += 1
+                partial_criteria.append("EMA5 below ATR long line")
                 logger.debug(f"Long EMA positioning check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("EMA5 not below ATR long line")
             
             # Check rising EMAs
             if self._check_rising_emas(historical_indicators, settings):
                 conditions_met += 1
+                partial_criteria.append("Rising EMAs")
                 logger.debug(f"Rising EMAs check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("EMAs not rising sufficiently")
             
             # Check FOMO filter
             if self._check_fomo_filter(market_data, indicators, settings):
                 conditions_met += 1
+                partial_criteria.append("FOMO filter passed")
                 logger.debug(f"FOMO filter check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("Failed FOMO filter (price too extended)")
             
             # Check volatility filter
             if self._check_volatility_filter(indicators, settings):
                 conditions_met += 1
+                partial_criteria.append("Volatility filter passed")
                 logger.debug(f"Volatility filter check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("Failed volatility filter")
             
             # Check higher timeframe confirmation if available
             htf_confirmed = True
@@ -321,15 +339,30 @@ class AlgorithmEngine:
                 total_conditions = 6
                 if self._check_higher_timeframe_confirmation_long(htf_market_data, htf_indicators):
                     conditions_met += 1
+                    partial_criteria.append("HTF confirmation")
                     logger.debug(f"HTF confirmation check passed for {market_data.symbol}")
                 else:
                     htf_confirmed = False
+                    rejection_reasons.append("Failed HTF confirmation")
+            else:
+                rejection_reasons.append("No HTF data available")
             
             # Calculate confidence score
             confidence = conditions_met / total_conditions
             
             # Signal is valid if all conditions are met
             signal_valid = conditions_met == total_conditions
+            
+            # Store analysis for diagnostics
+            self._last_analysis = {
+                'signal_type': 'long',
+                'conditions_met': conditions_met,
+                'total_conditions': total_conditions,
+                'rejection_reasons': rejection_reasons,
+                'partial_criteria': partial_criteria,
+                'confidence': confidence,
+                'signal_valid': signal_valid
+            }
             
             if signal_valid:
                 logger.info(f"Long signal generated for {market_data.symbol} with confidence {confidence:.2f}")
@@ -338,6 +371,14 @@ class AlgorithmEngine:
             
         except Exception as e:
             logger.error(f"Error evaluating long conditions for {market_data.symbol}: {str(e)}")
+            self._last_analysis = {
+                'signal_type': 'long',
+                'error': str(e),
+                'rejection_reasons': [f"Algorithm error: {str(e)}"],
+                'partial_criteria': [],
+                'confidence': 0.0,
+                'signal_valid': False
+            }
             return False, 0.0
     
     def evaluate_short_conditions(self, market_data: MarketData, indicators: TechnicalIndicators,
@@ -362,44 +403,77 @@ class AlgorithmEngine:
         try:
             conditions_met = 0
             total_conditions = 5  # Will be 6 if HTF data is available
+            rejection_reasons = []
+            partial_criteria = []
             
             # Check polar formation
             if self._check_polar_formation_short(market_data, indicators):
                 conditions_met += 1
+                partial_criteria.append("Bearish polar formation")
                 logger.debug(f"Short polar formation check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("Failed bearish polar formation")
             
             # Check EMA positioning
             if self._check_ema_positioning_short(indicators):
                 conditions_met += 1
+                partial_criteria.append("EMA5 above ATR short line")
                 logger.debug(f"Short EMA positioning check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("EMA5 not above ATR short line")
             
             # Check falling EMAs
             if self._check_falling_emas(historical_indicators, settings):
                 conditions_met += 1
+                partial_criteria.append("Falling EMAs")
                 logger.debug(f"Falling EMAs check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("EMAs not falling sufficiently")
             
             # Check FOMO filter
             if self._check_fomo_filter(market_data, indicators, settings):
                 conditions_met += 1
+                partial_criteria.append("FOMO filter passed")
                 logger.debug(f"FOMO filter check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("Failed FOMO filter (price too extended)")
             
             # Check volatility filter
             if self._check_volatility_filter(indicators, settings):
                 conditions_met += 1
+                partial_criteria.append("Volatility filter passed")
                 logger.debug(f"Volatility filter check passed for {market_data.symbol}")
+            else:
+                rejection_reasons.append("Failed volatility filter")
             
             # Check higher timeframe confirmation if available
             if htf_market_data and htf_indicators:
                 total_conditions = 6
                 if self._check_higher_timeframe_confirmation_short(htf_market_data, htf_indicators):
                     conditions_met += 1
+                    partial_criteria.append("HTF confirmation")
                     logger.debug(f"HTF confirmation check passed for {market_data.symbol}")
+                else:
+                    rejection_reasons.append("Failed HTF confirmation")
+            else:
+                rejection_reasons.append("No HTF data available")
             
             # Calculate confidence score
             confidence = conditions_met / total_conditions
             
             # Signal is valid if all conditions are met
             signal_valid = conditions_met == total_conditions
+            
+            # Store analysis for diagnostics
+            self._last_analysis = {
+                'signal_type': 'short',
+                'conditions_met': conditions_met,
+                'total_conditions': total_conditions,
+                'rejection_reasons': rejection_reasons,
+                'partial_criteria': partial_criteria,
+                'confidence': confidence,
+                'signal_valid': signal_valid
+            }
             
             if signal_valid:
                 logger.info(f"Short signal generated for {market_data.symbol} with confidence {confidence:.2f}")
@@ -408,6 +482,14 @@ class AlgorithmEngine:
             
         except Exception as e:
             logger.error(f"Error evaluating short conditions for {market_data.symbol}: {str(e)}")
+            self._last_analysis = {
+                'signal_type': 'short',
+                'error': str(e),
+                'rejection_reasons': [f"Algorithm error: {str(e)}"],
+                'partial_criteria': [],
+                'confidence': 0.0,
+                'signal_valid': False
+            }
             return False, 0.0
     
     def generate_signals(self, market_data: MarketData, 
@@ -515,3 +597,12 @@ class AlgorithmEngine:
         except Exception as e:
             logger.error(f"Error generating signals for {market_data.symbol}: {str(e)}")
             return []
+    
+    def get_last_analysis(self) -> Optional[dict]:
+        """
+        Get the detailed analysis from the last signal evaluation.
+        
+        Returns:
+            Dictionary with analysis details or None if no analysis available
+        """
+        return self._last_analysis

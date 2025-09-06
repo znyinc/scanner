@@ -40,6 +40,16 @@ export interface AlgorithmSettings {
   higher_timeframe: string;
 }
 
+export interface ScanDiagnostics {
+  symbols_with_data: string[];
+  symbols_without_data: string[];
+  symbols_with_errors: Record<string, string>;
+  data_fetch_time: number;
+  algorithm_time: number;
+  total_data_points: Record<string, number>;
+  error_summary: Record<string, number>;
+}
+
 export interface ScanResult {
   id: string;
   timestamp: string;
@@ -47,6 +57,9 @@ export interface ScanResult {
   signals_found: Signal[];
   settings_used: AlgorithmSettings;
   execution_time: number;
+  scan_status?: string;
+  error_message?: string;
+  diagnostics?: ScanDiagnostics;
 }
 
 export interface Trade {
@@ -155,4 +168,52 @@ export interface NotificationAction {
   label: string;
   action: () => void;
   variant?: 'primary' | 'secondary';
+}
+
+// Enhanced diagnostic types for the new diagnostic UI components
+export interface SymbolDiagnostic {
+  symbol: string;
+  status: 'success' | 'no_data' | 'insufficient_data' | 'error';
+  data_points_1m: number;
+  data_points_15m: number;
+  timeframe_coverage: Record<string, boolean>;
+  error_message?: string;
+  fetch_time: number;
+  processing_time: number;
+}
+
+export interface PerformanceMetrics {
+  memory_usage_mb: number;
+  api_requests_made: number;
+  api_rate_limit_remaining: number;
+  cache_hit_rate: number;
+  concurrent_requests: number;
+  bottleneck_phase?: string;
+}
+
+export interface SignalAnalysis {
+  signals_found: number;
+  symbols_meeting_partial_criteria: Record<string, string[]>;
+  rejection_reasons: Record<string, string[]>;
+  confidence_distribution: Record<string, number>;
+}
+
+export interface DataQualityMetrics {
+  total_data_points: number;
+  success_rate: number;
+  average_fetch_time: number;
+  data_completeness: number;
+  quality_score: number;
+}
+
+export interface EnhancedScanDiagnostics extends ScanDiagnostics {
+  symbol_details: Record<string, SymbolDiagnostic>;
+  performance_metrics: PerformanceMetrics;
+  signal_analysis: SignalAnalysis;
+  data_quality_metrics: DataQualityMetrics;
+  settings_snapshot: AlgorithmSettings;
+}
+
+export interface EnhancedScanResult extends ScanResult {
+  diagnostics?: EnhancedScanDiagnostics;
 }

@@ -3,7 +3,8 @@ Configuration management for the Stock Scanner application.
 """
 import os
 from typing import List
-from pydantic import BaseSettings, validator
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -19,11 +20,16 @@ class Settings(BaseSettings):
     
     # Security settings
     secret_key: str = "dev-secret-key-change-in-production"
-    cors_origins: List[str] = ["http://localhost:3000"]
+    cors_origins: str = "http://localhost:3000"
     
     # External API settings
     yfinance_timeout: int = 30
     yfinance_retry_count: int = 3
+    
+    # AlphaVantage API settings
+    alphavantage_api_key: str = "demo"  # Default demo key, should be overridden in .env
+    alphavantage_timeout: int = 30
+    alphavantage_retry_count: int = 3
     
     # Logging settings
     log_level: str = "INFO"
@@ -32,22 +38,26 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"
     
-    @validator('cors_origins', pre=True)
+    @field_validator('cors_origins')
+    @classmethod
     def parse_cors_origins(cls, v):
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(',')]
         return v
     
-    @validator('log_level')
+    @field_validator('log_level')
+    @classmethod
     def validate_log_level(cls, v):
         valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if v.upper() not in valid_levels:
             raise ValueError(f'Log level must be one of: {valid_levels}')
         return v.upper()
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"
+    )
 
 
 # Global settings instance
@@ -72,3 +82,8 @@ def is_development() -> bool:
 def is_staging() -> bool:
     """Check if running in staging environment."""
     return settings.environment.lower() == "staging"
+
+
+def get_database_url() -> str:
+    """Get the database URL from settings."""
+    return settings.database_url

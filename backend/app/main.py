@@ -5,7 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 
-from .api import scan, backtest, settings
+from .api import scan, backtest, history, market_data
+from .api import settings as settings_router
 from .config import get_settings
 from .logging_config import setup_logging, get_logger
 from .monitoring import MetricsMiddleware, metrics_collector, get_health_status
@@ -72,7 +73,9 @@ app.add_middleware(
 # Include API routers
 app.include_router(scan.router)
 app.include_router(backtest.router)
-app.include_router(settings.router)
+app.include_router(history.router)
+app.include_router(settings_router.router)
+app.include_router(market_data.router)
 
 
 @app.get("/")

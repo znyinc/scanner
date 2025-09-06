@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { AlgorithmSettings, ScanResult, BacktestResult, HistoryFilters, ApiError } from '../types';
+import { AlgorithmSettings, ScanResult, BacktestResult, HistoryFilters, ApiError, EnhancedScanResult } from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -14,11 +14,11 @@ interface RetryConfig {
 }
 
 const defaultRetryConfig: RetryConfig = {
-  maxRetries: 3,
+  maxRetries: 1, // Reduced from 3 to 1 to prevent multiple scans
   retryDelay: 1000,
   retryCondition: (error) => {
-    // Retry on network errors or 5xx server errors
-    return !error.response || (error.response.status >= 500 && error.response.status < 600);
+    // Only retry on network errors, not server errors for scans
+    return !error.response;
   }
 };
 
@@ -79,22 +79,37 @@ export class ApiService {
     settings: AlgorithmSettings,
     onProgress?: ProgressCallback
   ): Promise<ScanResult> {
+    
     return this.withRetry(async () => {
       onProgress?.(0, 'Starting scan...');
       
-      const response = await api.post('/scan', {
+      const response = await api.post('/scan/', {
         symbols,
         settings
       });
-      
       onProgress?.(100, 'Scan completed');
       return response.data;
     });
   }
 
-  static async getScanHistory(filters?: HistoryFilters): Promise<ScanResult[]> {
+  static async getScanHistory(filters?: HistoryFilters): Promise<EnhancedScanResult[]> {
     return this.withRetry(async () => {
-      const response = await api.get('/history/scans', { params: filters });
+      const response = await api.get('/scan/history', { params: filters });
+      return response.data;
+    });
+  }
+
+  // Get basic market data for a single symbol
+  static async getMarketData(symbol: string): Promise<{
+    symbol: string;
+    lastPrice: number;
+    priceChange: number;
+    priceChangePercent: number;
+    volume: number;
+    exchange: string;
+  }> {
+    return this.withRetry(async () => {
+      const response = await api.get(`/market-data/${symbol}`);
       return response.data;
     });
   }
@@ -124,7 +139,7 @@ export class ApiService {
 
   static async getBacktestHistory(filters?: HistoryFilters): Promise<BacktestResult[]> {
     return this.withRetry(async () => {
-      const response = await api.get('/history/backtests', { params: filters });
+      const response = await api.get('/backtest/history', { params: filters });
       return response.data;
     });
   }

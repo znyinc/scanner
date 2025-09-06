@@ -35,8 +35,17 @@ A sophisticated stock scanner application that uses EMA-ATR algorithm with highe
 
 # Or manually:
 docker start stock-scanner-db  # Database
-cd backend && python run_server.py  # Backend
-cd frontend && npm start  # Frontend
+
+# Backend - Easy startup scripts:
+cd backend
+# Windows (choose one):
+start_backend.bat          # Batch file
+.\start_backend.ps1        # PowerShell script
+# Linux/macOS:
+source venv/bin/activate && python run_server.py
+
+# Frontend (new terminal)
+cd frontend && npm start
 ```
 
 **Access Points:**
@@ -90,14 +99,20 @@ cd scanner
 2. **Set up the backend:**
 ```bash
 cd backend
+
+# Create and activate virtual environment
 python -m venv venv
 
 # On Linux/macOS
 source venv/bin/activate
 
-# On Windows
-venv\Scripts\activate
+# On Windows PowerShell
+.\venv\Scripts\Activate.ps1
 
+# On Windows CMD
+venv\Scripts\activate.bat
+
+# Install dependencies (this fixes Pydantic v2 compatibility)
 pip install -r requirements.txt
 ```
 
@@ -124,11 +139,23 @@ cp .env.example .env.local
 # Edit .env.local if needed
 ```
 
-6. **Start the application:**
+6. **Verify installation (optional but recommended):**
 ```bash
-# Terminal 1 - Backend
 cd backend
-python run_server.py
+# Make sure virtual environment is activated first
+python verify_installation.py
+```
+
+7. **Start the application:**
+```bash
+# Terminal 1 - Backend (IMPORTANT: Make sure virtual environment is activated)
+cd backend
+# Easy startup (Windows):
+start_backend.bat
+# Or manually:
+# .\venv\Scripts\Activate.ps1  # Windows
+# source venv/bin/activate     # Linux/macOS
+# python run_server.py
 
 # Terminal 2 - Frontend
 cd frontend
@@ -229,6 +256,10 @@ DEBUG=true
 YFINANCE_TIMEOUT=30
 YFINANCE_RETRY_COUNT=3
 
+# AlphaVantage (Fallback Data Source)
+# Get free API key: https://www.alphavantage.co/support/#api-key
+ALPHAVANTAGE_API_KEY=your_alphavantage_api_key_here
+
 # Security
 SECRET_KEY=your-secret-key-here
 CORS_ORIGINS=http://localhost:3000
@@ -240,6 +271,130 @@ REACT_APP_API_URL=http://localhost:8000/api
 REACT_APP_WS_URL=ws://localhost:8000/ws
 REACT_APP_ENVIRONMENT=development
 ```
+
+## 🔧 Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. Pydantic Import Error
+**Error:** `PydanticImportError: BaseSettings has been moved to the pydantic-settings package`
+
+**Solution:**
+```bash
+cd backend
+# Make sure virtual environment is activated
+.\venv\Scripts\Activate.ps1  # Windows
+# or
+source venv/bin/activate     # Linux/macOS
+
+# Install/update required packages
+pip install "pydantic>=2.5" "pydantic-settings>=2.2"
+```
+
+#### 2. yfinance Rate Limiting
+**Error:** `429 Client Error: Too Many Requests` or `No price data found`
+
+**Solutions:**
+- **Wait**: Rate limits usually reset in 1-24 hours
+- **Use VPN**: Change your IP address to bypass limits
+- **Setup AlphaVantage fallback**: Get a free API key for automatic fallback
+- **Reduce frequency**: The app now uses hourly data instead of minute data to reduce API load
+
+**Setup AlphaVantage Fallback (Recommended):**
+1. Get free API key: https://www.alphavantage.co/support/#api-key
+2. Update .env: `ALPHAVANTAGE_API_KEY=your_key_here`
+3. Restart application
+4. Test: `python test_alphavantage_fallback.py`
+
+**Check if yfinance is working:**
+```bash
+cd backend
+python -c "import yfinance as yf; data = yf.Ticker('AAPL').history(period='1d'); print('Working!' if not data.empty else 'Still rate limited')"
+```
+
+#### 3. Virtual Environment Issues
+**Problem:** Commands fail because virtual environment is not activated
+
+**Solution:**
+Always activate the virtual environment before running Python commands:
+```bash
+cd backend
+# Windows PowerShell
+.\venv\Scripts\Activate.ps1
+
+# Windows CMD
+venv\Scripts\activate.bat
+
+# Linux/macOS
+source venv/bin/activate
+
+# You should see (venv) in your prompt
+```
+
+#### 4. Database Connection Issues
+**Error:** Database connection failures
+
+**Solutions:**
+```bash
+# Check if PostgreSQL is running
+# Windows
+net start postgresql-x64-13
+
+# Linux
+sudo systemctl start postgresql
+
+# macOS
+brew services start postgresql
+
+# Verify connection
+psql -h localhost -p 5432 -U your_username -d stock_scanner
+```
+
+#### 5. Port Already in Use
+**Error:** `Port 8000 is already in use`
+
+**Solutions:**
+```bash
+# Find and kill process using port 8000
+# Windows
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# Linux/macOS
+lsof -ti:8000 | xargs kill -9
+
+# Or use a different port
+uvicorn app.main:app --host 0.0.0.0 --port 8001
+```
+
+#### 6. Frontend Build Issues
+**Error:** npm install or build failures
+
+**Solutions:**
+```bash
+cd frontend
+# Clear cache and reinstall
+rm -rf node_modules package-lock.json
+npm cache clean --force
+npm install
+
+# If still failing, try with legacy peer deps
+npm install --legacy-peer-deps
+```
+
+### Data Configuration Changes
+
+The application has been updated with improved data reliability:
+
+**Interval Changes:**
+- **Main interval**: Changed from 1-minute to 1-hour
+- **Higher timeframe**: Changed from 15-minute to 4-hour
+- **Benefits**: Reduced API calls, better rate limit compliance, still effective for signal generation
+
+**Data Source Fallback:**
+- **Primary**: yfinance (free, no API key required)
+- **Fallback**: AlphaVantage (when yfinance fails after 3 attempts)
+- **Benefits**: Improved reliability, automatic failover, multiple data sources
 
 ## 🧪 Testing
 

@@ -3,9 +3,30 @@ Result models for scan and backtest operations.
 """
 from dataclasses import dataclass, asdict
 from datetime import datetime, date
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import json
 from .signals import Signal, AlgorithmSettings
+
+
+@dataclass
+class ScanDiagnostics:
+    """Detailed diagnostics for a scan operation."""
+    symbols_with_data: List[str]
+    symbols_without_data: List[str]
+    symbols_with_errors: Dict[str, str]  # symbol -> error message
+    data_fetch_time: float
+    algorithm_time: float
+    total_data_points: Dict[str, int]  # symbol -> number of data points
+    error_summary: Dict[str, int]  # error type -> count
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'ScanDiagnostics':
+        """Create instance from dictionary."""
+        return cls(**data)
 
 
 @dataclass
@@ -17,6 +38,9 @@ class ScanResult:
     signals_found: List[Signal]
     settings_used: AlgorithmSettings
     execution_time: float
+    diagnostics: Optional[ScanDiagnostics] = None
+    scan_status: str = "completed"  # completed, failed, partial
+    error_message: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -24,6 +48,8 @@ class ScanResult:
         data['timestamp'] = self.timestamp.isoformat()
         data['signals_found'] = [signal.to_dict() for signal in self.signals_found]
         data['settings_used'] = self.settings_used.to_dict()
+        if self.diagnostics:
+            data['diagnostics'] = self.diagnostics.to_dict()
         return data
 
     @classmethod
@@ -36,6 +62,8 @@ class ScanResult:
             data['signals_found'] = [Signal.from_dict(signal) for signal in data['signals_found']]
         if isinstance(data['settings_used'], dict):
             data['settings_used'] = AlgorithmSettings.from_dict(data['settings_used'])
+        if 'diagnostics' in data and data['diagnostics']:
+            data['diagnostics'] = ScanDiagnostics.from_dict(data['diagnostics'])
         return cls(**data)
 
     def to_json(self) -> str:

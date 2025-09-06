@@ -54,7 +54,7 @@ class AlgorithmSettings:
     ema21_rising_threshold: float = 0.005
     volatility_filter: float = 1.5
     fomo_filter: float = 1.0
-    higher_timeframe: str = "15m"
+    higher_timeframe: str = "4h"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""

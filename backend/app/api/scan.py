@@ -33,6 +33,9 @@ class ScanResponse(BaseModel):
     signals_found: List[dict]
     settings_used: dict
     execution_time: float
+    scan_status: str = "completed"
+    error_message: Optional[str] = None
+    diagnostics: Optional[dict] = None
 
 
 @router.post("/", response_model=ScanResponse)
@@ -95,7 +98,10 @@ async def scan_stocks(request: ScanRequest, http_request: Request):
                 symbols_scanned=result.symbols_scanned,
                 signals_found=[signal.to_dict() for signal in result.signals_found],
                 settings_used=result.settings_used.to_dict(),
-                execution_time=result.execution_time
+                execution_time=result.execution_time,
+                scan_status=result.scan_status,
+                error_message=result.error_message,
+                diagnostics=result.enhanced_diagnostics.to_dict() if result.enhanced_diagnostics else None
             )
             
     except ValidationError as exc:
@@ -234,7 +240,10 @@ async def get_scan_history(
                     symbols_scanned=result.symbols_scanned,
                     signals_found=[signal.to_dict() for signal in result.signals_found],
                     settings_used=result.settings_used.to_dict(),
-                    execution_time=result.execution_time
+                    execution_time=result.execution_time,
+                    scan_status=result.scan_status,
+                    error_message=result.error_message,
+                    diagnostics=result.enhanced_diagnostics.to_dict() if result.enhanced_diagnostics else None
                 )
                 for result in results
             ]

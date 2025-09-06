@@ -27,8 +27,9 @@ import {
 } from '@mui/material';
 import { Search, Visibility, Refresh } from '@mui/icons-material';
 import { ApiService, handleApiError } from '../services/api';
-import { ScanResult, BacktestResult, HistoryFilters } from '../types';
+import { BacktestResult, HistoryFilters, EnhancedScanResult } from '../types';
 import ResponsiveTable from './ResponsiveTable';
+import DiagnosticDetails from './DiagnosticDetails';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -51,12 +52,16 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 
 const HistoryViewer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<number>(0);
-  const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
+  const [scanHistory, setScanHistory] = useState<EnhancedScanResult[]>([]);
   const [backtestHistory, setBacktestHistory] = useState<BacktestResult[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
+  // Diagnostic state
+  const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
+  const [expandedDiagnostics, setExpandedDiagnostics] = useState<Set<string>>(new Set());
   
   // Filters
   const [filters, setFilters] = useState<HistoryFilters>({});
@@ -71,7 +76,7 @@ const HistoryViewer: React.FC = () => {
   const itemsPerPage = isMobile ? 5 : 10;
   
   // Detail dialog
-  const [selectedItem, setSelectedItem] = useState<ScanResult | BacktestResult | null>(null);
+  const [selectedItem, setSelectedItem] = useState<EnhancedScanResult | BacktestResult | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -152,9 +157,34 @@ const HistoryViewer: React.FC = () => {
     loadHistory();
   };
 
-  const viewDetails = (item: ScanResult | BacktestResult) => {
+  const viewDetails = (item: EnhancedScanResult | BacktestResult) => {
     setSelectedItem(item);
     setDetailDialogOpen(true);
+  };
+
+  // Toggle diagnostic details for a specific scan
+  const toggleDiagnostics = (scanId: string) => {
+    setExpandedDiagnostics(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(scanId)) {
+        newSet.delete(scanId);
+      } else {
+        newSet.add(scanId);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle diagnostic export
+  const handleDiagnosticExport = (scanId: string) => {
+    // TODO: Implement export functionality
+    console.log('Export diagnostics for scan:', scanId);
+  };
+
+  // Handle diagnostic refresh
+  const handleDiagnosticRefresh = (scanId: string) => {
+    // TODO: Implement refresh functionality
+    console.log('Refresh diagnostics for scan:', scanId);
   };
 
   const formatDateTime = (dateTime: string): string => {
@@ -180,7 +210,7 @@ const HistoryViewer: React.FC = () => {
     return backtestHistory.slice(startIndex, startIndex + itemsPerPage);
   };
 
-  const isScanResult = (item: ScanResult | BacktestResult): item is ScanResult => {
+  const isScanResult = (item: EnhancedScanResult | BacktestResult): item is EnhancedScanResult => {
     return 'signals_found' in item;
   };
 
@@ -203,6 +233,12 @@ const HistoryViewer: React.FC = () => {
       label: 'Signals', 
       priority: 1,
       format: (value: number) => `${value} signals`
+    },
+    { 
+      id: 'scan_status', 
+      label: 'Status', 
+      priority: 2,
+      format: (value: string) => value || 'completed'
     },
     { 
       id: 'execution_time', 
@@ -256,11 +292,12 @@ const HistoryViewer: React.FC = () => {
 
   // Transform scan history for table display
   const getScanHistoryRows = () => {
-    return getPaginatedScans().map((scan: ScanResult) => ({
+    return getPaginatedScans().map((scan: EnhancedScanResult) => ({
       id: scan.id,
       timestamp: scan.timestamp,
       symbols_scanned_count: scan.symbols_scanned.length,
       signals_found_count: scan.signals_found.length,
+      scan_status: scan.scan_status || 'completed',
       execution_time: scan.execution_time,
       _original: scan
     }));
@@ -280,54 +317,110 @@ const HistoryViewer: React.FC = () => {
     }));
   };
 
+  // Get status color for scan status
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'success';
+      case 'partial': return 'warning';
+      case 'failed': return 'error';
+      default: return 'default';
+    }
+  };
+
   // Mobile card renderer for scan history
-  const renderScanCard = (row: any, index: number) => (
-    <Box key={index}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-        <Typography variant="body2" color="text.secondary">
-          {formatDateTime(row.timestamp)}
-        </Typography>
-        <Button
-          size="small"
-          startIcon={<Visibility />}
-          onClick={() => viewDetails(row._original)}
-          aria-label={`View scan details from ${formatDateTime(row.timestamp)}`}
-        >
-          View
-        </Button>
-      </Box>
-      <Grid container spacing={1}>
-        <Grid item xs={4}>
+  const renderScanCard = (row: any, index: number) => {
+    const scan = row._original;
+    const hasErrors = scan.diagnostics?.symbols_with_errors && Object.keys(scan.diagnostics.symbols_with_errors).length > 0;
+    const hasNoData = scan.diagnostics?.symbols_without_data && scan.diagnostics.symbols_without_data.length > 0;
+    
+    return (
+      <Box key={index}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            Symbols
+            {formatDateTime(row.timestamp)}
           </Typography>
-          <Chip 
-            label={`${row.symbols_scanned_count}`} 
-            size="small" 
-            variant="outlined"
-          />
-        </Grid>
-        <Grid item xs={4}>
-          <Typography variant="body2" color="text.secondary">
-            Signals
-          </Typography>
-          <Chip 
-            label={`${row.signals_found_count}`}
-            color={row.signals_found_count > 0 ? 'success' : 'default'}
+          <Button
             size="small"
-          />
+            startIcon={<Visibility />}
+            onClick={() => viewDetails(row._original)}
+            aria-label={`View scan details from ${formatDateTime(row.timestamp)}`}
+          >
+            View
+          </Button>
+        </Box>
+        <Grid container spacing={1}>
+          <Grid item xs={3}>
+            <Typography variant="body2" color="text.secondary">
+              Status
+            </Typography>
+            <Chip 
+              label={row.scan_status}
+              color={getStatusColor(row.scan_status)}
+              size="small"
+            />
+          </Grid>
+          <Grid item xs={3}>
+            <Typography variant="body2" color="text.secondary">
+              Symbols
+            </Typography>
+            <Chip 
+              label={`${row.symbols_scanned_count}`} 
+              size="small" 
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={3}>
+            <Typography variant="body2" color="text.secondary">
+              Signals
+            </Typography>
+            <Chip 
+              label={`${row.signals_found_count}`}
+              color={row.signals_found_count > 0 ? 'success' : 'default'}
+              size="small"
+            />
+          </Grid>
+          <Grid item xs={3}>
+            <Typography variant="body2" color="text.secondary">
+              Time
+            </Typography>
+            <Typography variant="body2">
+              {row.execution_time.toFixed(2)}s
+            </Typography>
+          </Grid>
         </Grid>
-        <Grid item xs={4}>
-          <Typography variant="body2" color="text.secondary">
-            Time
-          </Typography>
-          <Typography variant="body2">
-            {row.execution_time.toFixed(2)}s
-          </Typography>
-        </Grid>
-      </Grid>
-    </Box>
-  );
+        
+        {/* Diagnostic Summary */}
+        {scan.diagnostics && !showDiagnostics && (
+          <Box sx={{ mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Typography variant="caption" color="text.secondary" display="block">
+              Data: {scan.diagnostics.symbols_with_data.length} success
+              {hasNoData && `, ${scan.diagnostics.symbols_without_data.length} no data`}
+              {hasErrors && `, ${Object.keys(scan.diagnostics.symbols_with_errors).length} errors`}
+            </Typography>
+            {scan.error_message && (
+              <Typography variant="caption" color="error.main" display="block">
+                {scan.error_message}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        {/* Enhanced Diagnostic Details */}
+        {showDiagnostics && scan.diagnostics && (
+          <Box sx={{ mt: 2 }}>
+            <DiagnosticDetails
+              scanResult={scan}
+              expanded={expandedDiagnostics.has(scan.id)}
+              onToggle={() => toggleDiagnostics(scan.id)}
+              showExportButton={true}
+              onExport={handleDiagnosticExport}
+              onRefresh={handleDiagnosticRefresh}
+            />
+          </Box>
+        )}
+      </Box>
+    );
+  };
 
   // Mobile card renderer for backtest history
   const renderBacktestCard = (row: any, index: number) => (
@@ -507,6 +600,15 @@ const HistoryViewer: React.FC = () => {
                       Refresh
                     </Button>
                   </Box>
+                  <Button
+                    fullWidth
+                    variant={showDiagnostics ? "contained" : "outlined"}
+                    onClick={() => setShowDiagnostics(!showDiagnostics)}
+                    disabled={isLoading}
+                    aria-label={showDiagnostics ? "Hide diagnostics" : "Show diagnostics"}
+                  >
+                    {showDiagnostics ? "Hide" : "Show"} Diagnostics
+                  </Button>
                 </Stack>
               ) : (
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -533,6 +635,14 @@ const HistoryViewer: React.FC = () => {
                     aria-label="Refresh history data"
                   >
                     Refresh
+                  </Button>
+                  <Button
+                    variant={showDiagnostics ? "contained" : "outlined"}
+                    onClick={() => setShowDiagnostics(!showDiagnostics)}
+                    disabled={isLoading}
+                    aria-label={showDiagnostics ? "Hide diagnostics" : "Show diagnostics"}
+                  >
+                    {showDiagnostics ? "Hide" : "Show"} Diagnostics
                   </Button>
                 </Box>
               )}
@@ -590,14 +700,59 @@ const HistoryViewer: React.FC = () => {
               <Alert severity="info" role="status">No scan history found.</Alert>
             ) : (
               <>
-                <ResponsiveTable
-                  columns={scanHistoryColumns}
-                  rows={getScanHistoryRows()}
-                  ariaLabel="Scan history table"
-                  mobileCardView={true}
-                  renderMobileCard={renderScanCard}
-                  stickyHeader={false}
-                />
+                {isMobile ? (
+                  // Mobile card view
+                  <Stack spacing={2}>
+                    {getPaginatedScans().map((scan, index) => (
+                      <Card key={scan.id} variant="outlined">
+                        <CardContent>
+                          {renderScanCard({ _original: scan, ...scan }, index)}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Stack>
+                ) : (
+                  // Desktop table view with optional diagnostics
+                  <Box>
+                    <ResponsiveTable
+                      columns={scanHistoryColumns}
+                      rows={getScanHistoryRows()}
+                      ariaLabel="Scan history table"
+                      mobileCardView={false}
+                      stickyHeader={false}
+                    />
+                    
+                    {/* Desktop Diagnostic Details */}
+                    {showDiagnostics && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="h6" gutterBottom>
+                          Diagnostic Details
+                        </Typography>
+                        <Stack spacing={2}>
+                          {getPaginatedScans().map((scan) => (
+                            scan.diagnostics && (
+                              <Card key={`diagnostic-${scan.id}`} variant="outlined">
+                                <CardContent>
+                                  <Typography variant="subtitle1" gutterBottom>
+                                    Scan from {formatDateTime(scan.timestamp)}
+                                  </Typography>
+                                  <DiagnosticDetails
+                                    scanResult={scan}
+                                    expanded={expandedDiagnostics.has(scan.id)}
+                                    onToggle={() => toggleDiagnostics(scan.id)}
+                                    showExportButton={true}
+                                    onExport={handleDiagnosticExport}
+                                    onRefresh={handleDiagnosticRefresh}
+                                  />
+                                </CardContent>
+                              </Card>
+                            )
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+                  </Box>
+                )}
                 
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                   <Pagination
@@ -667,21 +822,73 @@ const HistoryViewer: React.FC = () => {
               
               {isScanResult(selectedItem) ? (
                 <>
-                  <Typography variant="body2" gutterBottom>
-                    Symbols Scanned: {selectedItem.symbols_scanned.join(', ')}
+                  {/* Basic Scan Information */}
+                  <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                    Scan Overview
                   </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    Execution Time: {selectedItem.execution_time.toFixed(2)}s
-                  </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    Signals Found: {selectedItem.signals_found.length}
-                  </Typography>
-                  {selectedItem.signals_found.length > 0 && (
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Signal Details:
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Status
                       </Typography>
-                      {selectedItem.signals_found.map((signal, index) => (
+                      <Chip 
+                        label={selectedItem.scan_status || 'completed'}
+                        color={getStatusColor(selectedItem.scan_status || 'completed')}
+                        size="small"
+                        sx={{ mb: 1 }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Execution Time
+                      </Typography>
+                      <Typography variant="body2">
+                        {selectedItem.execution_time.toFixed(2)}s
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        Symbols Scanned
+                      </Typography>
+                      <Typography variant="body2">
+                        {selectedItem.symbols_scanned.join(', ')}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+
+                  {/* Error Message */}
+                  {selectedItem.error_message && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="h6" gutterBottom color="error.main">
+                        Error Details
+                      </Typography>
+                      <Alert severity="error">
+                        {selectedItem.error_message}
+                      </Alert>
+                    </Box>
+                  )}
+
+                  {/* Enhanced Diagnostic Information */}
+                  {selectedItem.diagnostics && (
+                    <Box sx={{ mt: 2 }}>
+                      <DiagnosticDetails
+                        scanResult={selectedItem}
+                        expanded={true}
+                        onToggle={() => {}} // Always expanded in dialog
+                        showExportButton={true}
+                        onExport={handleDiagnosticExport}
+                        onRefresh={handleDiagnosticRefresh}
+                      />
+                    </Box>
+                  )}
+
+                  {/* Signals Found */}
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Signals Found ({selectedItem.signals_found.length})
+                    </Typography>
+                    {selectedItem.signals_found.length > 0 ? (
+                      selectedItem.signals_found.map((signal, index) => (
                         <Box key={index} sx={{ ml: 2, mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
                           <Typography variant="body2">
                             <strong>{signal.symbol}</strong> - {signal.signal_type.toUpperCase()} at {formatPrice(signal.price)}
@@ -690,9 +897,13 @@ const HistoryViewer: React.FC = () => {
                             Confidence: {formatPercentage(signal.confidence)}
                           </Typography>
                         </Box>
-                      ))}
-                    </Box>
-                  )}
+                      ))
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No signals found in this scan.
+                      </Typography>
+                    )}
+                  </Box>
                 </>
               ) : (
                 <>

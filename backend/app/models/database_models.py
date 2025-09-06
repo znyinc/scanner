@@ -19,6 +19,16 @@ class ScanResultDB(Base):
     signals_found = Column(JSONB, nullable=False)
     settings_used = Column(JSONB, nullable=False)
     execution_time = Column(Numeric(10, 3), nullable=False)
+    diagnostics = Column(JSONB, nullable=True)  # Basic scan diagnostics (legacy)
+    scan_status = Column(String(20), nullable=False, default="completed")  # completed, failed, partial
+    error_message = Column(Text, nullable=True)  # Error message if scan failed
+    
+    # Enhanced diagnostic fields
+    enhanced_diagnostics = Column(JSONB, nullable=True)  # Comprehensive diagnostic data
+    performance_metrics = Column(JSONB, nullable=True)  # System performance metrics
+    signal_analysis = Column(JSONB, nullable=True)  # Signal generation analysis
+    data_quality_score = Column(Numeric(3, 2), nullable=True)  # Overall quality score (0.00-1.00)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
