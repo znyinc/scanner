@@ -446,6 +446,39 @@ docker-compose -f docker-compose.prod.yml build
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
+## ☁️ Azure Cloud Deployment
+
+The Stock Scanner supports multiple Azure deployment options with built-in scaling capabilities:
+
+### Azure Deployment Options
+
+| Option | Use Case | Scaling | Complexity | Cost |
+|--------|----------|---------|------------|------|
+| **Container Instances** | Dev/Test, Simple deployments | Manual | Low | $ |
+| **App Service** | Production web apps | Automatic | Medium | $$ |
+| **Kubernetes (AKS)** | Enterprise, Microservices | Advanced | High | $$$ |
+
+### Quick Azure Deployment
+
+```bash
+# Deploy to Azure App Service (Recommended)
+az login
+git clone https://github.com/znyinc/scanner.git
+cd scanner/terraform
+terraform init
+terraform apply -var-file="terraform.tfvars.prod"
+```
+
+### Azure Auto-scaling Features
+
+- **App Service Auto-scaling**: Based on CPU, memory, and HTTP queue length
+- **AKS Horizontal Pod Autoscaler**: Kubernetes-native scaling
+- **Azure Database Scaling**: Automatic storage and compute scaling
+- **Load Balancing**: Azure Application Gateway and Front Door
+- **Global Distribution**: Multi-region deployment support
+
+For detailed Azure deployment instructions, see [Azure Deployment Guide](docs/AZURE_DEPLOYMENT_GUIDE.md).
+
 ## 📚 Documentation
 
 | Document | Description |
@@ -454,6 +487,7 @@ docker-compose -f docker-compose.prod.yml up -d
 | [API Documentation](docs/API_DOCUMENTATION.md) | REST API reference and examples |
 | [Code Documentation](docs/CODE_DOCUMENTATION.md) | Technical architecture and code documentation |
 | [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Production deployment and setup instructions |
+| [Azure Deployment Guide](docs/AZURE_DEPLOYMENT_GUIDE.md) | Azure cloud deployment with scaling capabilities |
 
 ## 🏗️ Architecture
 

@@ -1,0 +1,50 @@
+# Production Environment
+app_name    = "stockscanner"
+environment = "prod"
+location    = "East US 2"
+owner       = "Platform Team"
+cost_center = "Engineering"
+
+# Database Configuration
+db_admin_username          = "stockscanner_admin"
+db_sku_name               = "GP_Standard_D4s_v3"  # General Purpose 4 vCores
+db_storage_mb             = 262144                # 256GB
+db_backup_retention_days  = 30                   # Extended retention
+enable_high_availability  = true                 # Enable HA
+
+# App Service Configuration
+app_service_sku_name = "P1v3"  # Premium tier for production
+
+# Auto-scaling Configuration
+autoscale_min_capacity     = 2
+autoscale_max_capacity     = 20
+autoscale_default_capacity = 3
+
+# Container Registry
+acr_sku = "Premium"  # Premium tier with geo-replication
+
+# Monitoring
+log_analytics_retention_days = 90
+
+# Network Configuration
+vnet_address_space            = ["10.0.0.0/16"]
+app_subnet_address_prefixes   = ["10.0.1.0/24"]
+db_subnet_address_prefixes    = ["10.0.2.0/24"]
+appgw_subnet_address_prefixes = ["10.0.3.0/24"]
+
+# Security
+allowed_ip_ranges = ["52.0.0.0/8", "13.0.0.0/8"]  # Restrict to known Azure IP ranges
+enable_waf        = true
+
+# Feature Flags
+enable_container_registry    = true
+enable_key_vault            = true
+enable_application_insights = true
+enable_front_door           = true
+enable_redis                = true
+
+# Domain Configuration
+custom_domain = "stockscanner.yourdomain.com"
+
+# Alert Configuration
+alert_email_address = "ops-team@company.com"
